@@ -1,0 +1,57 @@
+name: 🛡️ Audit Preparer 분석 파이프라인
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: '실행할 작업'
+        required: true
+        default: 'news'
+        type: choice
+        options:
+          - news
+          - risks
+          - persona
+          - questions
+      file_path:
+        description: '분석할 파일 경로 (미리 repo에 업로드된 경우)'
+        required: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 🐍 Python 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 패키지 설치
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: 🚀 파이프라인 실행
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+        run: |
+          cd backend
+          # 환경변수에서 인증 정보 생성
+          echo "$GOOGLE_CREDENTIALS_JSON" > credentials/service_account.json
+          
+          TASK="${{ github.event.inputs.task || 'news' }}"
+          FILE="${{ github.event.inputs.file_path }}"
+          
+          if [ -n "$FILE" ]; then
+            python run_pipeline.py --task $TASK --file "../$FILE"
+          else
+            python run_pipeline.py --task $TASK
+          fi
