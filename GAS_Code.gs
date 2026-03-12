@@ -34,8 +34,11 @@ function doGet(e) {
     }
 
     if (action === 'getAllData') {
+      let personas = getTabData(ss, '의원별 관심사');
+      if (personas.length === 0) personas = getTabData(ss, '의원별 페르소나'); 
+      
       return createResponse({
-        personas: getTabData(ss, '의원별 관심사'),
+        personas: personas,
         risks: getTabData(ss, '리스크 요인'),
         questions: getTabData(ss, '예상 질문'),
         news_count: getTabRowCount(ss, '최근 뉴스') - 1
