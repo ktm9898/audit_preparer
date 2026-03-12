@@ -1,305 +1,816 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { 
-  FileText, 
-  Search, 
-  AlertTriangle, 
-  HelpCircle, 
-  Upload, 
-  RefreshCw, 
-  ChevronRight,
-  Database,
-  Users,
-  CheckCircle2
+  FileText, Search, AlertTriangle, HelpCircle, 
+  Upload, RefreshCw, Database, Users, CheckCircle2,
+  Menu, X, ChevronRight, LayoutDashboard, UserCheck, ShieldAlert, MessageSquare
 } from 'lucide-react';
 
-// API 설정 (로컬 개발: http://localhost:8000 / 프로덕션: GAS Web App URL)
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const IS_GAS = API_BASE.includes('script.google.com');
 
+// ── 공통 컴포넌트 ────────────────────────────────────────────────────────
+
+const MiniFileManager = ({ files, type, label, onUpload }) => (
+  <div className="mini-fm">
+    <div className="mf-header">
+      <div className="mf-title">
+        <Database size={16} />
+        <span>{label} 보관함</span>
+      </div>
+      <label className="mf-add">
+        <Upload size={14}/> <span>파일 추가</span>
+        <input type="file" hidden onChange={e => onUpload(e, type)}/>
+      </label>
+    </div>
+    <div className="mf-list">
+      {!Array.isArray(files) || files.length === 0 ? (
+        <div className="mf-empty">등록된 파일이 없습니다.</div>
+      ) : (
+        files.map(f => (
+          <div key={f.id} className="mf-item" title={f.name}>
+            <FileText size={14} className="icon-doc" />
+            <span className="name">{f.name}</span>
+          </div>
+        ))
+      )}
+    </div>
+  </div>
+);
+
+const StatCard = ({ title, value, icon: Icon, color, onClick }) => (
+  <div className={`stat-card ${color}`} onClick={onClick}>
+    <div className="stat-icon-box">
+      {Icon && <Icon size={24} />}
+    </div>
+    <div className="stat-info">
+      <div className="stat-label">{title}</div>
+      <div className="stat-value">{value}</div>
+    </div>
+    <ChevronRight size={18} className="stat-arrow" />
+  </div>
+);
+
+// ── 메인 앱 ──────────────────────────────────────────────────────────────
+
 function App() {
-  const [data, setData] = useState({
-    personas: [],
-    risks: [],
-    news_count: 0,
-    questions: []
-  });
+  const [personas, setPersonas] = useState([]);
+  const [risks, setRisks] = useState([]);
+  const [questions, setQuestions] = useState([]);
+  const [newsCount, setNewsCount] = useState(0);
+  const [minutesFiles, setMinutesFiles] = useState([]);
+  const [reportFiles, setReportFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [activeTab, setActiveTab] = useState('summary');
+  const [passcode, setPasscode] = useState(localStorage.getItem('audit_passcode') || 'audit123');
+  const [showSettings, setShowSettings] = useState(false);
+
+  const fetchInitialData = async () => {
+    setLoading(true);
+    setStatus('데이터를 불러오는 중...');
+    try {
+      const res = await axios.get(`${API_BASE}?action=getAllData&token=${passcode}`);
+      setPersonas(res.data.personas || []);
+      setRisks(res.data.risks || []);
+      setQuestions(res.data.questions || []);
+      setNewsCount(res.data.news_count || 0);
+
+      const mRes = await axios.get(`${API_BASE}?action=listFiles&type=minutes&token=${passcode}`);
+      if (Array.isArray(mRes.data)) setMinutesFiles(mRes.data);
+      const rRes = await axios.get(`${API_BASE}?action=listFiles&type=report&token=${passcode}`);
+      if (Array.isArray(rRes.data)) setReportFiles(rRes.data);
+      
+      setStatus('');
+    } catch (err) { 
+      console.error('데이터 로드 오류:', err); 
+      setStatus('연결 확인 필요 (비밀번호나 주소를 확인해 주세요)'); 
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [passcode]);
 
-  const fetchData = async () => {
-    try {
-      const url = IS_GAS ? `${API_BASE}?action=getAllData` : `${API_BASE}/data`;
-      const res = await axios.get(url);
-      setData(res.data);
-    } catch (err) {
-      console.error('데이터 로드 실패', err);
-    }
+  const savePasscode = (code) => {
+    setPasscode(code);
+    localStorage.setItem('audit_passcode', code);
+    setShowSettings(false);
+    setStatus('비밀번호가 저장되었습니다.');
+    setTimeout(() => setStatus(''), 3000);
   };
 
-  const handleAction = async (endpoint, formData = null, ghTask = null) => {
+  const handleAction = async (task, fileId = null) => {
     setLoading(true);
-    setStatus('진행 중...');
+    setStatus('AI가 분석 작업을 수행 중입니다. (약 30초~1분 소요)');
     try {
-      if (IS_GAS && ghTask) {
-        // GitHub Actions 트리거 모드
-        const url = `${API_BASE}?action=triggerWorkflow&task=${ghTask}`;
-        const res = await axios.get(url); // GAS는 GET으로 트리거 (doGet에서 처리)
-        setStatus(res.data.message || '요청 성공');
+      const response = await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ 
+          action: 'runAnalysis', 
+          task, 
+          fileId,
+          token: passcode 
+        })
+      });
+      const result = await response.json();
+      
+      if (result.ok) {
+        setStatus('분석 완료! 데이터를 새로고침합니다.');
+        await fetchInitialData();
       } else {
-        // 로컬 백엔드 모드
-        const config = formData ? { headers: { 'Content-Type': 'multipart/form-data' } } : {};
-        const res = await axios.post(`${API_BASE}${endpoint}`, formData, config);
-        setStatus(res.data.message);
+        throw new Error(result.error || '분석 중 서버 오류');
       }
-      await fetchData();
-    } catch (err) {
-      setStatus('오류가 발생했습니다.');
-      console.error(err);
+    } catch (err) { 
+      console.error('분석 요청 에러:', err);
+      setStatus(`요청 실패: ${err.message}`); 
     } finally {
       setLoading(false);
-      setTimeout(() => setStatus(''), 3000);
+      setTimeout(() => setStatus(''), 8000);
     }
   };
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case 'personas':
-        return (
-          <div className="tab-content animate-fade-in">
-            <div className="section-header">
-              <Users size={24} className="icon-blue" />
-              <h2>시의원 페르소나</h2>
-              <div className="spacer"></div>
-              {IS_GAS ? (
-                <div className="gh-actions-group">
-                  <span className="gh-tip">분석용 파일 업로드 후 클릭:</span>
-                  <button className="premium-btn secondary" onClick={() => handleAction(null, null, 'persona')}>
-                    <Database size={18} /> 의원 스타일 분석 (GH)
-                  </button>
-                </div>
-              ) : (
-                <label className="premium-btn secondary">
-                  <Upload size={18} />
-                  회의록 업로드 (PDF/TXT)
-                  <input type="file" hidden onChange={(e) => handleAction('/analyze-persona', createFormData(e.target.files[0]))} />
-                </label>
-              )}
-            </div>
-            <div className="grid-container">
-              {data.personas.map((p, i) => (
-                <div key={i} className="glass-panel card">
-                  <div className="card-header">
-                    <h3>{p.의원명}</h3>
-                    <span className="badge">{p.소속}</span>
-                  </div>
-                  <div className="card-body">
-                    <p><strong>주요 관심사:</strong> {p["주요 관심사"]}</p>
-                    <p><strong>질문 스타일:</strong> {p["질문 스타일"]}</p>
-                    <p className="danger-text"><strong>공격 포인트:</strong> {p["공격 포인트"]}</p>
-                  </div>
-                  <div className="card-footer">최근 업데이트: {p["마지막 업데이트"]}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      case 'risks':
-        return (
-          <div className="tab-content animate-fade-in">
-            <div className="section-header">
-              <AlertTriangle size={24} className="icon-orange" />
-              <h2>최근 1년 리스크 요인</h2>
-              <div className="spacer"></div>
-              {IS_GAS ? (
-                <div className="gh-actions-group">
-                   <button className="premium-btn" onClick={() => handleAction(null, null, 'news')}>
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                    뉴스 수집 (GH)
-                  </button>
-                  <button className="premium-btn" onClick={() => handleAction(null, null, 'risks')}>
-                    <Search size={18} />
-                    리스크 분석 (GH)
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <button className="premium-btn" onClick={() => handleAction('/refresh-news')}>
-                    <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-                    뉴스 수집
-                  </button>
-                  <button className="premium-btn" onClick={() => handleAction('/analyze-risks')}>
-                    <Search size={18} />
-                    리스크 분석
-                  </button>
-                </>
-              )}
-            </div>
-            {/* ... lines ... */}
-          </div>
-        );
-      case 'questions':
-        return (
-          <div className="tab-content animate-fade-in">
-            <div className="section-header">
-              <HelpCircle size={24} className="icon-purple" />
-              <h2>최종 예상 질문</h2>
-              <div className="spacer"></div>
-              {IS_GAS ? (
-                 <div className="gh-actions-group">
-                  <span className="gh-tip">보고서 업로드 후 클릭:</span>
-                  <button className="premium-btn" onClick={() => handleAction(null, null, 'questions')}>
-                    <FileText size={18} /> 예상질문 생성 (GH)
-                  </button>
-                </div>
-              ) : (
-                <label className="premium-btn">
-                  <FileText size={18} />
-                  업무보고서 기반 질문 생성
-                  <input type="file" hidden onChange={(e) => handleAction('/generate-questions', createFormData(e.target.files[0], 'report'))} />
-                </label>
-              )}
-            </div>
-            <div className="qa-container">
-              {data.questions.map((q, i) => (
-                <div key={i} className="glass-panel qa-item">
-                  <div className="qa-header">
-                    <span className="qa-author">{q.의원명} 의원</span>
-                    <span className="qa-risk">관련 리스크: {q["관련 리스크"]}</span>
-                  </div>
-                  <div className="qa-content">
-                    <div className="question-box">
-                      <strong>Q: </strong>{q.질문}
-                    </div>
-                    <div className="answer-box">
-                      <strong>A: </strong>{q["답변(모범답안)"]}
-                    </div>
-                    <div className="meta-box">
-                      <p><strong>공격포인트:</strong> {q.공격포인트}</p>
-                      <p><strong>근거:</strong> {q["근거(뉴스/보고서)"]}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="summary-view animate-fade-in">
-            <div className="hero-section">
-              <h1>Audit Preparer</h1>
-              <p>서울신용보증재단 행정사무감사 완벽 대비 시스템</p>
-            </div>
-            <div className="stats-grid">
-              <div className="glass-panel stat-card" onClick={() => setActiveTab('personas')}>
-                <Users size={32} />
-                <div className="stat-value">{data.personas.length}</div>
-                <div className="stat-label">등록된 페르소나</div>
-              </div>
-              <div className="glass-panel stat-card" onClick={() => setActiveTab('risks')}>
-                <AlertTriangle size={32} />
-                <div className="stat-value">{data.risks.length}</div>
-                <div className="stat-label">분석된 리스크</div>
-              </div>
-              <div className="glass-panel stat-card">
-                <Database size={32} />
-                <div className="stat-value">{data.news_count}</div>
-                <div className="stat-label">수집된 뉴스</div>
-              </div>
-              <div className="glass-panel stat-card" onClick={() => setActiveTab('questions')}>
-                <HelpCircle size={32} />
-                <div className="stat-value">{data.questions.length}</div>
-                <div className="stat-label">생성된 질문</div>
-              </div>
-            </div>
-          </div>
-        );
+  const fetchNews = async () => {
+    setLoading(true);
+    setStatus('최신 뉴스를 수집 및 검토 중입니다...');
+    try {
+      const res = await axios.get(`${API_BASE}?action=fetchNews&token=${passcode}`);
+      if (res.data.ok) {
+        setStatus(`뉴스 수집 완료: ${res.data.count || 0}건의 주요 뉴스 추가`);
+        await fetchInitialData();
+      } else {
+        throw new Error(res.data.error || '수집 실패');
+      }
+    } catch (err) {
+      console.error('뉴스 수집 실패:', err);
+      setStatus(`수집 실패: ${err.message}`);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setStatus(''), 8000);
     }
   };
 
-  const createFormData = (file, key = 'file') => {
-    const fd = new FormData();
-    fd.append(key, file);
-    return fd;
+  const handleFileUpload = async (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const MAX_SIZE = 15 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      alert(`파일이 너무 큽니다. 15MB 이하만 가능합니다.`);
+      return;
+    }
+    
+    const mimeType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
+    setLoading(true); 
+    setStatus(`'${file.name}' 업로드 중...`);
+    
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = async () => {
+      try {
+        const base64 = reader.result.split(',')[1];
+        const payload = JSON.stringify({ 
+          action: 'uploadFile',
+          filename: file.name, 
+          mimeType: mimeType, 
+          base64: base64, 
+          type: type,
+          token: passcode
+        });
+
+        const response = await fetch(API_BASE, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: payload
+        });
+
+        if (!response.ok) {
+          throw new Error(`통신 오류 (Http ${response.status})`);
+        }
+
+        const text = await response.text();
+        let result;
+        try {
+          result = JSON.parse(text);
+        } catch (parseErr) {
+          console.error('JSON 파싱 실패:', text, parseErr);
+          throw new Error('서버가 올바른 응답을 주지 않았습니다. (GAS 배포 업데이트 필요)');
+        }
+
+        if (result.ok) {
+          setStatus('업로드 성공!');
+          const res = await axios.get(`${API_BASE}?action=listFiles&type=${type}`);
+          if (type === 'minutes') setMinutesFiles(res.data); else setReportFiles(res.data);
+        } else {
+          throw new Error(result.error || '업로드 처리 중 서버 오류');
+        }
+      } catch (err) { 
+        console.error('업로드 실패 원인:', err);
+        let msg = err.message;
+        if (msg === 'Failed to fetch') {
+          msg = '연결 차단됨 (보통 여러 구글 계정 로그인 또는 브라우저 보안 때문). 시크릿 창에서 시도하거나 GAS의 [새 배포]를 다시 해주세요.';
+        }
+        setStatus(`업로드 실패: ${msg}`); 
+      } finally {
+        setLoading(false);
+        setTimeout(() => setStatus(''), 8000);
+      }
+    };
+  };
+
+  const checkConnection = async () => {
+    setStatus('서버 연결 확인 중...');
+    try {
+      const res = await fetch(`${API_BASE}?action=getAllData&token=${passcode}`);
+      if (res.ok) {
+        setStatus('서버 연결 상태: 양호 ✅');
+      } else {
+        setStatus(`서버 연결 실패: 오류 코드 ${res.status} ❌`);
+      }
+    } catch (err) {
+      console.error('연결 확인 실패:', err);
+      setStatus('연결 확인 실패: 주소나 비밀번호를 확인해 주세요. ❌');
+    }
+    setTimeout(() => setStatus(''), 5000);
   };
 
   return (
-    <div className="app-container">
-      <nav className="glass-panel main-nav">
-        <div className="logo">Audit Preparer</div>
-        <div className="nav-links">
-          <button className={activeTab === 'summary' ? 'active' : ''} onClick={() => setActiveTab('summary')}>대시보드</button>
-          <button className={activeTab === 'personas' ? 'active' : ''} onClick={() => setActiveTab('personas')}>의원 스타일</button>
-          <button className={activeTab === 'risks' ? 'active' : ''} onClick={() => setActiveTab('risks')}>이슈/리스크</button>
-          <button className={activeTab === 'questions' ? 'active' : ''} onClick={() => setActiveTab('questions')}>예상 질문</button>
+    <div className="audit-app">
+      {/* 배경 장식 */}
+      <div className="bg-decoration"></div>
+      
+      {/* 설정 모달 */}
+      {showSettings && (
+        <div className="modal-overlay">
+          <div className="settings-modal fade-in">
+            <div className="modal-header">
+              <h3>시스템 설정</h3>
+              <button className="close-btn" onClick={() => setShowSettings(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>GAS 보안 비밀번호 (ACCESS_TOKEN)</label>
+                <input 
+                  type="password" 
+                  value={passcode} 
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="GAS 스크립트 속성에 설정된 토큰 입력"
+                />
+                <p className="help-text">이 비밀번호는 브라우저에만 저장되며 통신 시 암호로 사용됩니다.</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setShowSettings(false)}>취소</button>
+              <button className="btn-primary" onClick={() => savePasscode(passcode)}>저장하기</button>
+            </div>
+          </div>
         </div>
-        {status && <div className="status-toast glass-panel">{status}</div>}
-      </nav>
+      )}
+      
+      {/* 네비게이션 */}
+      <header className="main-header">
+        <div className="header-container">
+          <div className="brand" onClick={() => setActiveTab('summary')}>
+            <div className="logo-box">AP</div>
+            <div className="brand-text">
+              <span className="title">Audit Preparer</span>
+              <span className="sub">서울신용보증재단 행정감사 대비</span>
+            </div>
+          </div>
+          <div className="header-right">
+            <button className="diag-btn" onClick={() => setShowSettings(true)}>
+              <Settings size={14} /> 설정
+            </button>
+            <button className="diag-btn" onClick={checkConnection}>
+              <RefreshCw size={14} className={loading ? 'spin' : ''} /> 서버 연결 확인
+            </button>
+            <nav className="nav-menu">
+              <button className={activeTab === 'summary' ? 'active' : ''} onClick={() => setActiveTab('summary')}>
+                <LayoutDashboard size={18} /> <span>대시보드</span>
+              </button>
+              <button className={activeTab === 'personas' ? 'active' : ''} onClick={() => setActiveTab('personas')}>
+                <UserCheck size={18} /> <span>의원 스타일</span>
+              </button>
+              <button className={activeTab === 'risks' ? 'active' : ''} onClick={() => setActiveTab('risks')}>
+                <ShieldAlert size={18} /> <span>이슈/리스크</span>
+              </button>
+              <button className={activeTab === 'questions' ? 'active' : ''} onClick={() => setActiveTab('questions')}>
+                <MessageSquare size={18} /> <span>예상 질문</span>
+              </button>
+            </nav>
+          </div>
+        </div>
+      </header>
 
-      <main className="main-content">
-        {renderTab()}
+      {/* 메인 콘텐츠 */}
+      <main className="content-area">
+        <div className="container">
+          {activeTab === 'summary' && (
+            <div className="view-summary fade-in">
+              <div className="welcome-banner">
+                <div className="banner-txt">
+                  <h1>안녕하세요, 관리자님 👋</h1>
+                  <p>오늘의 감사 대비 현황을 한눈에 확인하세요.</p>
+                </div>
+                <button className="refresh-btn" onClick={fetchInitialData}>
+                  <RefreshCw size={18} className={loading ? 'spin' : ''} />
+                  새로고침
+                </button>
+              </div>
+              
+              <div className="stats-grid">
+                <StatCard 
+                  title="등록된 의원 페르소나" 
+                  value={`${personas.length}명`} 
+                  icon={Users} 
+                  color="blue"
+                  onClick={() => setActiveTab('personas')}
+                />
+                <StatCard 
+                  title="분석된 리스크 요인" 
+                  value={`${risks.length}건`} 
+                  icon={ShieldAlert} 
+                  color="red"
+                  onClick={() => setActiveTab('risks')}
+                />
+                <StatCard 
+                  title="수집된 관련 뉴스" 
+                  value={`${newsCount}건`} 
+                  icon={RefreshCw} 
+                  color="green"
+                  onClick={fetchNews}
+                />
+                <StatCard 
+                  title="최종 대비 예상 질문" 
+                  value={`${questions.length}개`} 
+                  icon={HelpCircle} 
+                  color="purple"
+                  onClick={() => setActiveTab('questions')}
+                />
+              </div>
+
+              <div className="dashboard-footer">
+                <div className="system-status">
+                  <div className="status-dot"></div>
+                  <span>시스템 정상 작동 중</span>
+                  <span className="update-time">마지막 업데이트: {new Date().toLocaleTimeString()}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'personas' && (
+            <div className="view-tab fade-in">
+              <div className="section-header">
+                <div className="title-row">
+                  <UserCheck size={24} className="title-icon" />
+                  <h2>의원 스타일 분석 현황</h2>
+                </div>
+                <button className="action-btn primary" onClick={() => handleAction('persona')}>
+                  <Search size={18} /> 분석 파이프라인 실행
+                </button>
+              </div>
+              
+              <div className="layout-with-sidebar">
+                <div className="main-content">
+                  <div className="card-grid">
+                    {personas.map((p, i) => (
+                      <div key={i} className="content-card persona">
+                        <div className="card-top">
+                          <span className="name">{p.의원명} 의원</span>
+                          <span className="party-badge">{p.소속}</span>
+                        </div>
+                        <div className="card-body">
+                          <div className="info-group">
+                            <label>주요 관심 포인트</label>
+                            <p>{p["주요 관심사"]}</p>
+                          </div>
+                          <div className="info-group danger">
+                            <label>예상 공격 전략</label>
+                            <p>{p["공격 포인트"]}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {personas.length === 0 && (
+                    <div className="empty-state">데이터가 없습니다. 분석을 실행해 주세요.</div>
+                  )}
+                </div>
+                <aside className="sidebar">
+                  <MiniFileManager files={minutesFiles} type="minutes" label="시의회 회의록" onUpload={handleFileUpload} />
+                </aside>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'risks' && (
+            <div className="view-tab fade-in">
+              <div className="section-header">
+                <div className="title-row">
+                  <ShieldAlert size={24} className="title-icon" />
+                  <h2>실시간 이슈 및 리스크 분석</h2>
+                </div>
+                <div className="btn-group">
+                  <button className="action-btn" onClick={fetchNews}>
+                    <RefreshCw size={16} /> 뉴스 수집
+                  </button>
+                  <button className="action-btn primary" onClick={() => handleAction('risks')}>
+                    <AlertTriangle size={16} /> 리스크 추출
+                  </button>
+                </div>
+              </div>
+              
+              <div className="list-container">
+                {risks.map((r, i) => (
+                  <div key={i} className="list-item-card">
+                    <div className="item-icon"><ShieldAlert size={20} /></div>
+                    <div className="item-content">
+                      <h3>{r["리스크 요인"]}</h3>
+                      <p>{r["세부 내용"]}</p>
+                      <div className="item-meta">근거 데이터: {r["관련 근거"]}</div>
+                    </div>
+                    <CheckCircle2 size={24} className="check-icon" />
+                  </div>
+                ))}
+                {risks.length === 0 && (
+                  <div className="empty-state">분석된 리스크 요인이 없습니다.</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'questions' && (
+            <div className="view-tab fade-in">
+              <div className="section-header">
+                <div className="title-row">
+                  <MessageSquare size={24} className="title-icon" />
+                  <h2>최종 관문: 예상 질문 및 대응</h2>
+                </div>
+                <button className="action-btn primary" onClick={() => handleAction('questions')}>
+                  <HelpCircle size={18} /> 답변 시나리오 생성
+                </button>
+              </div>
+              
+              <div className="layout-with-sidebar">
+                <div className="main-content">
+                  <div className="qa-list">
+                    {questions.map((q, i) => (
+                      <div key={i} className="qa-card">
+                        <div className="qa-header">
+                          <span className="tag">{q["분류"] || `질문 ${i+1}`}</span>
+                          <span className="meta">{q.의원명} 의원</span>
+                        </div>
+                        <div className="qa-body">
+                          <div className="q-box">
+                            <span className="label">Q</span>
+                            <div className="txt">{q.질문}</div>
+                          </div>
+                          <div className="a-box">
+                            <span className="label">A</span>
+                            <div className="txt">{q["답변 가이드"] || q["답변(모범답안)"]}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {questions.length === 0 && (
+                    <div className="empty-state">생성된 질문 시나리오가 없습니다.</div>
+                  )}
+                </div>
+                <aside className="sidebar">
+                  <MiniFileManager files={reportFiles} type="report" label="재단 업무보고서" onUpload={handleFileUpload} />
+                </aside>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
 
+      {/* 상태 토스트 */}
+      {status && (
+        <div className="toast-message fade-in">
+          {loading && <RefreshCw size={16} className="spin" />}
+          <span>{status}</span>
+        </div>
+      )}
+
+      {/* 스타일 시스템 */}
       <style>{`
-        .app-container { max-width: 1400px; margin: 0 auto; padding: 2rem; padding-top: 6rem; }
-        .main-nav { position: fixed; top: 1.5rem; left: 50%; transform: translateX(-50%); width: calc(100% - 4rem); max-width: 1400px; height: 4.5rem; display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; z-index: 1000; border-radius: 1.25rem; }
-        .logo { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #6366f1, #0ea5e9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .nav-links { display: flex; gap: 1rem; }
-        .nav-links button { background: none; border: none; color: var(--text-muted); font-weight: 600; font-size: 0.95rem; padding: 0.5rem 1rem; border-radius: 0.75rem; }
-        .nav-links button.active { color: var(--text-main); background: rgba(255, 255, 255, 0.05); }
-        .status-toast { position: fixed; bottom: 2rem; right: 2rem; padding: 0.75rem 1.5rem; border-left: 4px solid var(--primary); animation: slideIn 0.3s ease-out; }
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+        :root {
+          --primary: #4f46e5;
+          --primary-light: #eef2ff;
+          --secondary: #0ea5e9;
+          --success: #10b981;
+          --danger: #ef4444;
+          --warning: #f59e0b;
+          --bg: #f8fafc;
+          --card: #ffffff;
+          --text: #1e293b;
+          --text-muted: #64748b;
+          --border: #e2e8f0;
+          --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+          --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        * { box-sizing: border-box; }
+        body { 
+          background-color: var(--bg); 
+          color: var(--text); 
+          font-family: 'Pretendard', sans-serif; 
+          margin: 0; 
+          line-height: 1.5;
+        }
+
+        .audit-app { min-height: 100vh; padding-top: 5rem; position: relative; }
         
-        .hero-section { text-align: center; padding: 4rem 0; }
-        .hero-section h1 { font-size: 4rem; font-weight: 900; margin-bottom: 1rem; letter-spacing: -2px; }
-        .hero-section p { color: var(--text-muted); font-size: 1.25rem; }
+        .bg-decoration {
+          position: fixed; top: 0; left: 0; right: 0; height: 300px;
+          background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%);
+          z-index: -1;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+        /* Header & Nav */
+        .main-header {
+          position: fixed; top: 0; left: 0; right: 0;
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(10px);
+          border-bottom: 1px solid var(--border);
+          height: 4.5rem; z-index: 1000;
+        }
+        .header-container {
+          max-width: 1200px; margin: 0 auto; height: 100%;
+          display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem;
+        }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .diag-btn {
+          background: none; border: 1px solid var(--border); padding: 0.4rem 0.8rem;
+          border-radius: 0.5rem; font-size: 0.75rem; font-weight: 700; color: var(--text-muted);
+          cursor: pointer; display: flex; align-items: center; gap: 0.4rem;
+        }
+        .diag-btn:hover { background: #f1f5f9; color: var(--primary); }
+        .brand { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
+        .logo-box {
+          width: 2.5rem; height: 2.5rem; border-radius: 0.6rem;
+          background: var(--primary); color: white;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 900; font-size: 1rem;
+        }
+        .brand-text .title { display: block; font-size: 1.1rem; font-weight: 800; color: var(--text); }
+        .brand-text .sub { font-size: 0.75rem; color: var(--text-muted); }
+
+        .nav-menu { display: flex; gap: 0.5rem; }
+        .nav-menu button {
+          border: none; background: none; padding: 0.6rem 1rem;
+          border-radius: 0.5rem; color: var(--text-muted);
+          font-weight: 600; font-size: 0.9rem;
+          display: flex; align-items: center; gap: 0.5rem;
+          transition: all 0.2s; cursor: pointer;
+        }
+        .nav-menu button:hover { background: var(--primary-light); color: var(--primary); }
+        .nav-menu button.active { background: var(--primary); color: white; box-shadow: var(--shadow); }
+
+        /* Modal & Settings */
+        .modal-overlay {
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+          background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 2000; animation: fadeIn 0.3s ease;
+        }
+        .settings-modal {
+          background: var(--card); border-radius: 1.25rem; width: 420px;
+          box-shadow: var(--shadow-lg); overflow: hidden;
+          border: 1px solid var(--border);
+        }
+        .modal-header {
+          padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);
+          display: flex; align-items: center; justify-content: space-between;
+          background: #f8fafc;
+        }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--text); }
+        .close-btn { 
+          background: none; border: none; cursor: pointer; color: var(--text-muted); 
+          display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 4px;
+        }
+        .close-btn:hover { background: #e2e8f0; color: var(--danger); }
+        .modal-body { padding: 1.75rem 1.5rem; }
+        .modal-footer {
+          padding: 1.25rem 1.5rem; background: #f8fafc;
+          border-top: 1px solid var(--border);
+          display: flex; justify-content: flex-end; gap: 0.75rem;
+        }
+        .form-group label { display: block; font-size: 0.85rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; }
+        .form-group input { 
+          width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); 
+          border-radius: 0.75rem; font-size: 0.95rem; outline: none; transition: border-color 0.2s;
+        }
+        .form-group input:focus { border-color: var(--primary); }
+        .help-text { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; line-height: 1.4; }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
-        .stat-card { padding: 2.5rem; text-align: center; cursor: pointer; transition: transform 0.3s; }
-        .stat-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.05); }
-        .stat-card .stat-value { font-size: 2.5rem; font-weight: 800; margin: 0.5rem 0; color: var(--primary); }
-        .stat-card .stat-label { color: var(--text-muted); font-weight: 500; }
+        .btn-primary { 
+          background: var(--primary); color: white; border: none; 
+          padding: 0.75rem 1.5rem; border-radius: 0.6rem; font-weight: 700; cursor: pointer;
+          transition: transform 0.1s;
+        }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-secondary {
+          background: white; border: 1px solid var(--border);
+          padding: 0.75rem 1.5rem; border-radius: 0.6rem; font-weight: 700; cursor: pointer;
+          color: var(--text-muted);
+        }
+        .btn-secondary:hover { background: #f1f5f9; color: var(--text); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Summary View */
+        .welcome-banner {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: 2.5rem; padding: 1rem 0;
+        }
+        .welcome-banner h1 { font-size: 1.8rem; font-weight: 800; margin: 0; margin-bottom: 0.5rem; }
+        .welcome-banner p { color: var(--text-muted); margin: 0; }
+        .refresh-btn {
+          display: flex; align-items: center; gap: 0.5rem;
+          background: white; border: 1px solid var(--border);
+          padding: 0.6rem 1.2rem; border-radius: 0.75rem;
+          font-weight: 700; font-size: 0.9rem; cursor: pointer;
+          transition: all 0.2s;
+        }
+        .refresh-btn:hover { background: #f1f5f9; }
+
+        .stats-grid { 
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); 
+          gap: 1.5rem; margin-bottom: 3rem;
+        }
+        .stat-card {
+          background: var(--card); padding: 1.5rem; border-radius: 1.25rem;
+          border: 1px solid var(--border); shadow: var(--shadow);
+          display: flex; align-items: center; gap: 1rem; cursor: pointer;
+          transition: all 0.3s; position: relative; overflow: hidden;
+        }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+        .stat-icon-box {
+          width: 3.5rem; height: 3.5rem; border-radius: 1rem;
+          display: flex; align-items: center; justify-content: center;
+        }
+        .stat-card.blue .stat-icon-box { background: #e0e7ff; color: #4338ca; }
+        .stat-card.orange .stat-icon-box { background: #ffedd5; color: #c2410c; }
+        .stat-card.indigo .stat-icon-box { background: #e0e7ff; color: #3730a3; }
+        .stat-card.purple .stat-icon-box { background: #f3e8ff; color: #7e22ce; }
         
-        .section-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; }
-        .spacer { flex: 1; }
-        .grid-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
-        .card { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
-        .card-header { display: flex; justify-content: space-between; align-items: center; }
-        .badge { background: rgba(99,102,241,0.1); color: var(--primary); padding: 0.25rem 0.75rem; border-radius: 2rem; font-size: 0.8rem; font-weight: 700; }
-        .danger-text { color: #f87171; }
-        .card-footer { font-size: 0.75rem; color: var(--text-muted); margin-top: auto; }
+        .stat-info { flex: 1; }
+        .stat-label { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.25rem; }
+        .stat-value { font-size: 1.75rem; font-weight: 800; }
+        .stat-arrow { color: var(--border); transition: transform 0.2s; }
+        .stat-card:hover .stat-arrow { transform: translateX(3px); color: var(--primary); }
+
+        .dashboard-footer { 
+          margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); 
+        }
+        .system-status { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: var(--text-muted); }
+        .status-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); }
+        .update-time { margin-left: auto; }
+
+        /* Tab Views */
+        .section-header {
+          display: flex; justify-content: space-between; align-items: flex-end;
+          margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border);
+        }
+        .title-row { display: flex; align-items: center; gap: 0.75rem; }
+        .title-icon { color: var(--primary); }
+        .section-header h2 { font-size: 1.5rem; font-weight: 800; margin: 0; }
         
+        .layout-with-sidebar { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; }
+        .sidebar { position: sticky; top: 6.5rem; height: fit-content; }
+
+        .action-btn {
+          display: flex; align-items: center; gap: 0.5rem;
+          padding: 0.75rem 1.25rem; border-radius: 0.75rem;
+          font-weight: 700; font-size: 0.9rem; cursor: pointer;
+          border: 1px solid var(--border); background: white;
+          transition: all 0.2s;
+        }
+        .action-btn.primary { background: var(--primary); color: white; border: none; shadow: var(--shadow); }
+        .action-btn.primary:hover { background: #4338ca; transform: translateY(-1px); }
+        .action-btn:active { transform: translateY(0); }
+
+        .btn-group { display: flex; gap: 0.5rem; }
+
+        /* Cards & Content */
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+        .content-card {
+          background: white; border: 1px solid var(--border);
+          border-radius: 1.25rem; padding: 1.5rem; shadow: var(--shadow);
+          transition: border-color 0.2s;
+        }
+        .content-card:hover { border-color: var(--primary); }
+        .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+        .card-top .name { font-size: 1.1rem; font-weight: 800; }
+        .party-badge { 
+          background: var(--primary-light); color: var(--primary);
+          font-size: 0.7rem; font-weight: 800; padding: 0.25rem 0.6rem; border-radius: 2rem;
+        }
+        .info-group { margin-bottom: 1rem; }
+        .info-group label { display: block; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem; }
+        .info-group p { font-size: 0.95rem; margin: 0; line-height: 1.6; }
+        .info-group.danger p { color: var(--danger); font-weight: 600; }
+
         .list-container { display: flex; flex-direction: column; gap: 1rem; }
-        .list-item { padding: 1.5rem; display: flex; align-items: center; gap: 1rem; }
-        .item-main { flex: 1; }
-        .item-main h4 { font-size: 1.15rem; margin-bottom: 0.25rem; }
-        .item-main p { color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; }
-        .status-icon { color: var(--accent); opacity: 0.7; }
-        
-        .qa-container { display: flex; flex-direction: column; gap: 1.5rem; }
-        .qa-item { padding: 2rem; border-left: 4px solid var(--primary); }
-        .qa-header { display: flex; justify-content: space-between; margin-bottom: 1.5rem; }
-        .qa-author { font-weight: 800; color: var(--secondary); }
-        .qa-risk { font-size: 0.85rem; color: var(--text-muted); }
-        .question-box { background: rgba(255,255,255,0.03); padding: 1.25rem; border-radius: 0.75rem; margin-bottom: 1rem; font-size: 1.1rem; line-height: 1.6; }
-        .answer-box { background: rgba(16,185,129,0.05); padding: 1.25rem; border-radius: 0.75rem; margin-bottom: 1.5rem; line-height: 1.6; border: 1px solid rgba(16,185,129,0.1); }
-        .meta-box { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem; color: var(--text-muted); }
+        .list-item-card {
+          background: white; border: 1px solid var(--border);
+          border-radius: 1rem; padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem;
+          transition: transform 0.2s;
+        }
+        .list-item-card:hover { transform: scale(1.005); border-color: var(--primary); }
+        .item-icon {
+          width: 3rem; height: 3rem; border-radius: 0.75rem;
+          background: #eff6ff; color: var(--primary);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .item-content { flex: 1; }
+        .item-content h3 { font-size: 1.1rem; font-weight: 800; margin: 0; margin-bottom: 0.4rem; }
+        .item-content p { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
+        .item-meta { font-size: 0.75rem; color: var(--secondary); margin-top: 0.75rem; font-weight: 600; }
+        .check-icon { color: var(--success); opacity: 0.3; }
 
-        .gh-actions-group { display: flex; align-items: center; gap: 1rem; }
-        .gh-tip { font-size: 0.8rem; color: var(--text-muted); opacity: 0.8; }
+        /* QA Style */
+        .qa-list { display: flex; flex-direction: column; gap: 1.5rem; }
+        .qa-card { 
+          background: white; border: 1px solid var(--border); 
+          border-radius: 1.25rem; padding: 2rem; 
+        }
+        .qa-header { 
+          display: flex; justify-content: space-between; 
+          margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #f1f5f9;
+        }
+        .qa-header .tag { font-weight: 900; color: var(--primary); font-size: 0.9rem; }
+        .qa-header .meta { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; }
+        .q-box, .a-box { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        .q-box .label, .a-box .label {
+          width: 2rem; height: 2rem; border-radius: 0.5rem;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 900; flex-shrink: 0;
+        }
+        .q-box .label { background: #fee2e2; color: #ef4444; }
+        .a-box .label { background: #dcfce7; color: #16a34a; }
+        .q-box .txt { font-size: 1.1rem; font-weight: 700; line-height: 1.5; }
+        .a-box .txt { font-size: 1rem; color: #334155; line-height: 1.7; }
 
-        .icon-blue { color: var(--primary); }
-        .icon-orange { color: #fb923c; }
-        .icon-purple { color: #a855f7; }
+        /* File Manager Sidebar */
+        .mini-fm {
+          background: white; border: 1px solid var(--border);
+          border-radius: 1.25rem; padding: 1.25rem; shadow: var(--shadow);
+        }
+        .mf-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+        .mf-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 0.95rem; }
+        .mf-add {
+          display: flex; align-items: center; gap: 0.3rem;
+          background: var(--primary-light); color: var(--primary);
+          padding: 0.4rem 0.75rem; border-radius: 0.5rem;
+          font-size: 0.75rem; font-weight: 800; cursor: pointer;
+        }
+        .mf-list { max-height: 400px; overflow-y: auto; }
+        .mf-item {
+          display: flex; align-items: center; gap: 0.6rem;
+          padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 0.5rem;
+          background: #f8fafc; font-size: 0.85rem; border: 1px solid transparent;
+        }
+        .mf-item:hover { border-color: var(--border); background: #f1f5f9; }
+        .mf-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+        .icon-doc { color: #94a3b8; }
+        .mf-empty { text-align: center; padding: 2rem 0; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
 
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        /* Utils */
+        .empty-state {
+          padding: 5rem 0; text-align: center; color: var(--text-muted);
+          background: white; border: 2px dashed var(--border); border-radius: 1.25rem;
+        }
+        .toast-message {
+          position: fixed; bottom: 2rem; right: 2rem;
+          background: #1e293b; color: white; padding: 1.25rem 2rem;
+          border-radius: 1rem; display: flex; align-items: center; gap: 1rem;
+          z-index: 2000; box-shadow: var(--shadow-lg); font-weight: 600;
+        }
+        .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin { animation: spin 1s linear infinite; }
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+          .layout-with-sidebar { grid-template-columns: 1fr; }
+          .sidebar { position: static; order: -1; margin-bottom: 2rem; }
+          .nav-menu span { display: none; }
+          .brand-text .sub { display: none; }
+        }
       `}</style>
     </div>
   );
