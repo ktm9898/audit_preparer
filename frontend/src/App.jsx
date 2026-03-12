@@ -3,7 +3,8 @@ import axios from 'axios';
 import { 
   FileText, Search, AlertTriangle, HelpCircle, 
   Upload, RefreshCw, Database, Users, CheckCircle2,
-  Menu, X, ChevronRight, LayoutDashboard, UserCheck, ShieldAlert, MessageSquare
+  Menu, X, ChevronRight, LayoutDashboard, UserCheck, ShieldAlert, MessageSquare,
+  Settings, ArrowUpRight, Trash2
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -11,7 +12,7 @@ const IS_GAS = API_BASE.includes('script.google.com');
 
 // ── 공통 컴포넌트 ────────────────────────────────────────────────────────
 
-const MiniFileManager = ({ files, type, label, onUpload }) => (
+const MiniFileManager = ({ files, type, label, onUpload, onDelete }) => (
   <div className="mini-fm">
     <div className="mf-header">
       <div className="mf-title">
@@ -29,8 +30,13 @@ const MiniFileManager = ({ files, type, label, onUpload }) => (
       ) : (
         files.map(f => (
           <div key={f.id} className="mf-item" title={f.name}>
-            <FileText size={14} className="icon-doc" />
-            <span className="name">{f.name}</span>
+            <div className="item-info">
+              <FileText size={14} className="icon-doc" />
+              <span className="name">{f.name}</span>
+            </div>
+            <button className="del-btn" onClick={() => onDelete(f.id, type, f.name)} title="파일 삭제">
+              <Trash2 size={12} />
+            </button>
           </div>
         ))
       )}
@@ -104,7 +110,7 @@ function App() {
 
   const handleAction = async (task, fileId = null) => {
     setLoading(true);
-    setStatus('AI가 분석 작업을 수행 중입니다. (약 30초~1분 소요)');
+    setStatus(fileId ? '선택한 파일을 분석 중입니다...' : '보관함의 모든 파일을 취합하여 AI 분석 중입니다... (약 1분 소요)');
     try {
       const response = await fetch(API_BASE, {
         method: 'POST',
@@ -222,6 +228,39 @@ function App() {
     };
   };
 
+  const handleDeleteFile = async (fileId, type, filename) => {
+    if (!window.confirm(`'${filename}' 파일을 삭제하시겠습니까?`)) return;
+
+    setLoading(true);
+    setStatus(`'${filename}' 삭제 중...`);
+    try {
+      const response = await fetch(API_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ 
+          action: 'deleteFile',
+          fileId,
+          token: passcode
+        })
+      });
+
+      const result = await response.json();
+      if (result.ok) {
+        setStatus('삭제 성공!');
+        const res = await axios.get(`${API_BASE}?action=listFiles&type=${type}&token=${passcode}`);
+        if (type === 'minutes') setMinutesFiles(res.data); else setReportFiles(res.data);
+      } else {
+        throw new Error(result.error || '삭제 중 서버 오류');
+      }
+    } catch (err) {
+      console.error('삭제 실패:', err);
+      setStatus(`삭제 실패: ${err.message}`);
+    } finally {
+      setLoading(false);
+      setTimeout(() => setStatus(''), 5000);
+    }
+  };
+
   const checkConnection = async () => {
     setStatus('서버 연결 확인 중...');
     try {
@@ -293,7 +332,7 @@ function App() {
                 <LayoutDashboard size={18} /> <span>대시보드</span>
               </button>
               <button className={activeTab === 'personas' ? 'active' : ''} onClick={() => setActiveTab('personas')}>
-                <UserCheck size={18} /> <span>의원 스타일</span>
+                <UserCheck size={18} /> <span>의원 관심사</span>
               </button>
               <button className={activeTab === 'risks' ? 'active' : ''} onClick={() => setActiveTab('risks')}>
                 <ShieldAlert size={18} /> <span>이슈/리스크</span>
@@ -324,7 +363,7 @@ function App() {
               
               <div className="stats-grid">
                 <StatCard 
-                  title="등록된 의원 페르소나" 
+                  title="등록된 의원 관심사" 
                   value={`${personas.length}명`} 
                   icon={Users} 
                   color="blue"
@@ -368,7 +407,7 @@ function App() {
               <div className="section-header">
                 <div className="title-row">
                   <UserCheck size={24} className="title-icon" />
-                  <h2>의원 스타일 분석 현황</h2>
+                  <h2>의원 관심사 분석 현황</h2>
                 </div>
                 <button className="action-btn primary" onClick={() => handleAction('persona')}>
                   <Search size={18} /> 분석 파이프라인 실행
@@ -379,22 +418,30 @@ function App() {
                 <div className="main-content">
                   <div className="card-grid">
                     {personas.map((p, i) => (
-                      <div key={i} className="content-card persona">
-                        <div className="card-top">
-                          <span className="name">{p.의원명} 의원</span>
-                          <span className="party-badge">{p.소속}</span>
-                        </div>
-                        <div className="card-body">
-                          <div className="info-group">
-                            <label>주요 관심 포인트</label>
-                            <p>{p["주요 관심사"]}</p>
+                          <div key={i} className="content-card persona">
+                            <div className="card-top">
+                              <span className="name">{p.의원명} 의원</span>
+                              <span className="party-badge">{p.지역구 || p.소속}</span>
+                            </div>
+                            <div className="card-body">
+                              <div className="info-group">
+                                <label>주요 관심사</label>
+                                <p>{p["주요 관심사"] || p["관심사"]}</p>
+                              </div>
+                              <div className="info-group">
+                                <label>질문 성향</label>
+                                <p>{p["질문 성향"] || p["질문 스타일"] || p["성향"] || p["스타일"]}</p>
+                              </div>
+                              <div className="info-group">
+                                <label>발언 요약</label>
+                                <p className="summary-text">{p["발언 요약"] || p["발언요약"]}</p>
+                              </div>
+                              <div className="info-group danger">
+                                <label>예상 감사 포인트</label>
+                                <p>{p["예상 감사 포인트"] || p["공격 포인트"]}</p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="info-group danger">
-                            <label>예상 공격 전략</label>
-                            <p>{p["공격 포인트"]}</p>
-                          </div>
-                        </div>
-                      </div>
                     ))}
                   </div>
                   {personas.length === 0 && (
@@ -402,7 +449,13 @@ function App() {
                   )}
                 </div>
                 <aside className="sidebar">
-                  <MiniFileManager files={minutesFiles} type="minutes" label="시의회 회의록" onUpload={handleFileUpload} />
+                  <MiniFileManager 
+                    files={minutesFiles} 
+                    type="minutes" 
+                    label="시의회 회의록" 
+                    onUpload={handleFileUpload} 
+                    onDelete={handleDeleteFile}
+                  />
                 </aside>
               </div>
             </div>
@@ -483,7 +536,13 @@ function App() {
                   )}
                 </div>
                 <aside className="sidebar">
-                  <MiniFileManager files={reportFiles} type="report" label="재단 업무보고서" onUpload={handleFileUpload} />
+                  <MiniFileManager 
+                    files={reportFiles} 
+                    type="report" 
+                    label="재단 업무보고서" 
+                    onUpload={handleFileUpload} 
+                    onDelete={handleDeleteFile}
+                  />
                 </aside>
               </div>
             </div>
@@ -777,15 +836,25 @@ function App() {
           padding: 0.4rem 0.75rem; border-radius: 0.5rem;
           font-size: 0.75rem; font-weight: 800; cursor: pointer;
         }
-        .mf-list { max-height: 400px; overflow-y: auto; }
-        .mf-item {
-          display: flex; align-items: center; gap: 0.6rem;
-          padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 0.5rem;
-          background: #f8fafc; font-size: 0.85rem; border: 1px solid transparent;
+        .mf-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .mf-item { 
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 0.6rem 0.75rem; background: #f8fafc; border-radius: 0.5rem;
+          font-size: 0.85rem; border: 1px solid transparent; transition: all 0.2s;
         }
-        .mf-item:hover { border-color: var(--border); background: #f1f5f9; }
-        .mf-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-        .icon-doc { color: #94a3b8; }
+        .mf-item:hover { border-color: var(--border); background: white; box-shadow: var(--shadow); }
+        .mf-item .item-info { display: flex; align-items: center; gap: 0.6rem; overflow: hidden; }
+        .mf-item .icon-doc { color: var(--text-muted); flex-shrink: 0; }
+        .mf-item .name { 
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+          font-weight: 500; color: var(--text);
+        }
+        .del-btn {
+          background: none; border: none; cursor: pointer; color: var(--text-muted);
+          padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
+          transition: all 0.2s; flex-shrink: 0;
+        }
+        .del-btn:hover { background: #fee2e2; color: var(--danger); }
         .mf-empty { text-align: center; padding: 2rem 0; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
 
         /* Utils */
