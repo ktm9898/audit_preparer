@@ -437,21 +437,23 @@ function App() {
                               <label>질문 성향</label>
                               <p>{p["질문 성향"] || p["성향"] || "-"}</p>
                             </div>
-                            <div className="meta-item danger">
-                              <label>핵심 감사 포인트</label>
-                              <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || "-"}</p>
-                            </div>
                           </div>
+                          
                           <div className="summary-section">
-                            <label>발언 상세 및 요약</label>
-                            <div className="summary-text-large">
+                            <label>상세 발언 요약</label>
+                            <div className="summary-text-box">
                               {p.발언요약 || p.상세발언 || p["발언 요약"] || p["발언요약"] || "-"}
                             </div>
+                          </div>
+
+                          <div className="audit-section danger">
+                            <label>핵심 감사 포인트</label>
+                            <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || "-"}</p>
                           </div>
                         </div>
                         <div className="card-footer-action">
                           <button className="premium-more-btn" onClick={() => setSelectedPersona(p)}>
-                            리포트 상세보기 <ArrowUpRight size={14} />
+                            상세 분석 리포트 <ArrowUpRight size={14} />
                           </button>
                         </div>
                       </div>
@@ -916,13 +918,23 @@ function App() {
           background: white; border: 2px dashed var(--border); border-radius: 1.25rem;
         }
         .metadata-grid { 
-          display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; 
-          margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.75rem;
+          display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; 
+          margin-bottom: 1.25rem;
         }
-        .meta-item.danger label { color: var(--danger); }
-        .meta-item.danger p { color: #b91c1c; }
-        .meta-item label { display: block; font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.15rem; }
-        .meta-item p { margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--text); }
+        .meta-item label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.3rem; }
+        .meta-item p { margin: 0; font-size: 0.9rem; font-weight: 500; color: var(--text); line-height: 1.4; }
+
+        .summary-section { margin-bottom: 1.25rem; }
+        .summary-section label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.4rem; }
+        .summary-text-box { 
+          background: #f8fafc; padding: 0.85rem 1rem; border-radius: 0.75rem; 
+          border: 1px dashed var(--border); font-size: 0.9rem; line-height: 1.6;
+          color: #334155; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+
+        .audit-section { margin-top: auto; padding-top: 0.5rem; }
+        .audit-section label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 0.3rem; }
+        .audit-section.danger p { color: #dc2626; font-weight: 600; font-size: 0.95rem; margin: 0; line-height: 1.5; }
 
         .analysis-grid-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
         .analysis-card { background: #f8fafc; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
