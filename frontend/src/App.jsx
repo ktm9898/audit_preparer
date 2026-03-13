@@ -436,7 +436,11 @@ function App() {
                             <div className="meta-item">
                               <label>질문 성향</label>
                               <p>{p["질문 성향"] || p["성향"] || "-"}</p>
+                              <div className="meta-item danger">
+                              <label>핵심 감사 포인트</label>
+                              <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || "-"}</p>
                             </div>
+                          </div>
                           </div>
                           <div className="summary-section">
                             <label>발언 상세 및 요약</label>
@@ -909,9 +913,11 @@ function App() {
           background: white; border: 2px dashed var(--border); border-radius: 1.25rem;
         }
         .metadata-grid { 
-          display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; 
+          display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; 
           margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.75rem;
         }
+        .meta-item.danger label { color: var(--danger); }
+        .meta-item.danger p { color: #b91c1c; }
         .meta-item label { display: block; font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.15rem; }
         .meta-item p { margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--text); }
 
