@@ -146,7 +146,7 @@ function fetchNewsFromNaver() {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
-  const headers = ["날짜", "주제", "언론사", "제목", "네이버요약", "본문전문", "링크", "AI요약", "중요도"];
+  const headers = ['날짜', '주제', '언론사', '제목', '네이버요약', '본문전문', '링크', 'AI요약', '중요도'];
   
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
@@ -210,11 +210,10 @@ function crawlNewsContent(newsList) {
       const response = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, followRedirects: true, timeout: 5000 });
       if (response.getResponseCode() === 200) {
         const html = response.getContentText();
-        // Gemini에게 본문 추출 요청
         const res = extractTextWithAI(html, API_KEY, item.title);
-        if (res && res.length > 100) { // 100자 이상일 경우에만 업데이트
-          item.aiSummary = res;
-          item.fullText = html.substring(0, 50000); // 본문 일부 저장 (너무 크면 안됨)
+        if (res && res.length > 200) { 
+          item.fullText = res;
+          item.aiSummary = res.substring(0, 300) + "...";
         }
       } else {
         console.warn(`크롤링 실패: ${item.link}, 응답 코드: ${response.getResponseCode()}`);
@@ -228,7 +227,7 @@ function crawlNewsContent(newsList) {
 
 function extractTextWithAI(html, apiKey, title) {
   if (!apiKey) return null;
-  const prompt = `뉴스 제목: ${title}\n\n이 뉴스 기사의 본문 텍스트만 추출하여 500자 내외로 상세히 요약해줘. 홍보 문구나 불필요한 광고, 태그는 완전히 제외하고 기사의 본문 내용만 요약해.\n\n[HTML 본문]\n${html.substring(0, 15000)}`;
+  const prompt = `뉴스 제목: ${title}\n\n[지시사항]\n1. 아래 뉴스 페이지 HTML에서 기사의 "본문 전문"만 정확하게 추출하세요.\n2. 광고, 기자 정보, 추천 기사, 브라우저 메뉴, 댓글, SNS 공유 버튼 등 본문 이외의 모든 노이즈는 완벽하게 제거하세요.\n3. 요약하지 말고, 기사 원문의 흐름과 내용을 최대한 상세히 보존하세요.\n4. 응답은 오직 정제된 본문 텍스트만 반환하세요.\n\n[HTML 데이터]\n${html.substring(0, 20000)}`;
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     const payload = { contents: [{ parts: [{ text: prompt }] }] };

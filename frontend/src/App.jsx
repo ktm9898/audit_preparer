@@ -480,60 +480,56 @@ function App() {
             <div className="view-tab fade-in">
               <div className="section-header">
                 <div className="title-row">
-                  <ShieldAlert size={24} className="title-icon" />
-                  <h2>실시간 이슈 및 리스크 분석</h2>
+                  <Newspaper size={24} className="title-icon" />
+                  <h2>수집 뉴스 아카이브</h2>
                 </div>
                 <div className="btn-group">
                   <button className="action-btn secondary" onClick={fetchNews}>
-                    <Newspaper size={16} /> 관련 뉴스 수집
-                  </button>
-                  <button className="action-btn primary" onClick={() => handleAction('risks')}>
-                    <AlertTriangle size={16} /> 리스크 추출
+                    <RefreshCw size={16} className={loading ? 'spin' : ''} /> 최신 뉴스 수집
                   </button>
                 </div>
               </div>
 
               <div className="risks-layout">
+                {/* 메인: 뉴스 목록 (Premium Card Style) */}
                 <div className="risks-main">
-                  <div className="section-title-sm">분석된 리스크 요인 ({risks.length})</div>
-                  <div className="list-container">
-                    {risks.map((r, i) => (
-                      <div key={i} className="list-item-card">
-                        <div className="item-icon"><ShieldAlert size={20} /></div>
-                        <div className="item-content">
-                          <h3>{r["리스크 요인"]}</h3>
-                          <p>{r["세부 내용"]}</p>
-                          <div className="item-meta">근거 데이터: {r["관련 근거"]}</div>
-                        </div>
-                        <CheckCircle2 size={24} className="check-icon" />
-                      </div>
-                    ))}
-                    {risks.length === 0 && (
-                      <div className="empty-state">분석된 리스크 요인이 없습니다.</div>
+                  <div className="section-title-sm">수집된 관련 뉴스 ({newsCount}건)</div>
+                  <div className="news-feed-grid">
+                    {news.length === 0 ? (
+                      <div className="empty-state-sm">수집된 뉴스가 없습니다. '최신 뉴스 수집' 버튼을 눌러주세요.</div>
+                    ) : (
+                      news.map((item, idx) => (
+                        <a key={idx} href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="premium-news-card">
+                          <div className="news-badge">{item.언론사 || "뉴스"}</div>
+                          <div className="news-content">
+                            <h3 className="news-title">{item.제목 || item.title}</h3>
+                            <p className="news-desc">{item.AI요약 || item.naverDesc || item.요약 || "본문 내용을 확인해 주세요."}</p>
+                            <div className="news-meta">
+                              <span className="news-date">{item.날짜 || "오늘"}</span>
+                              <ExternalLink size={12} />
+                            </div>
+                          </div>
+                        </a>
+                      ))
                     )}
                   </div>
                 </div>
 
+                {/* 사이드바: 분석된 리스크 요인 */}
                 <div className="risks-sub">
                   <div className="section-header-sm">
-                    <div className="title-row">
-                      <Newspaper size={18} />
-                      <span className="txt">수집된 근거 뉴스</span>
-                    </div>
-                    <button className="refresh-mini-btn" onClick={fetchNews} title="뉴스 새로고침">
-                      <RefreshCw size={14} className={loading ? 'spin' : ''} />
-                    </button>
+                    <div className="title-row"><ShieldAlert size={16} /><span>추출된 리스크</span></div>
                   </div>
-                  <div className="mini-news-list">
-                    {news.map((item, i) => (
-                      <a key={i} href={item.link || item["링크"]} target="_blank" rel="noreferrer" className="mini-news-card">
-                        <span className="date">{item.date || item["날짜"]}</span>
-                        <div className="title">{item.title || item["제목"]}</div>
-                        <p>{item["AI요약"] || item["AI 요약"] || item.aiSummary || item["네이버요약"] || item["네이버 요약"] || item.desc || item["요약"] || item["본문내용"] || item["내용"] || "내용 요약 중..."}</p>
-                      </a>
-                    ))}
-                    {news.length === 0 && (
-                      <div className="empty-state-sm">뉴스가 없습니다.</div>
+                  <div className="mini-risk-list">
+                    {risks.length === 0 ? (
+                      <div className="empty-state-sm">추출된 리스크가 없습니다.<br/>'예상 질문' 탭에서 [리스크 추출]을 진행하세요.</div>
+                    ) : (
+                      risks.map((r, i) => (
+                        <div key={i} className="mini-risk-card">
+                          <div className="risk-title">{r["리스크 요인"]}</div>
+                          <div className="risk-body">{r["세부 내용"]}</div>
+                        </div>
+                      ))
                     )}
                   </div>
                 </div>
@@ -541,9 +537,74 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'news' && (
+          {activeTab === 'questions' && (
             <div className="view-tab fade-in">
-              {/* 제거됨 */}
+              <div className="section-header">
+                <div className="title-row">
+                  <HelpCircle size={24} className="title-icon" />
+                  <h2>행정감사 상정 질문 및 대응</h2>
+                </div>
+                <div className="btn-group">
+                  <button className="action-btn secondary" onClick={() => handleAction('risks')}>
+                    <ShieldAlert size={16} /> 리스크 추출
+                  </button>
+                  <button className="action-btn primary" onClick={() => handleAction('questions')}>
+                    <MessageSquare size={16} /> 예상 질문 및 답변 생성
+                  </button>
+                </div>
+              </div>
+
+              <div className="questions-flow">
+                {risks.length > 0 && (
+                  <div className="analysis-step">
+                    <div className="step-header">
+                      <div className="step-num">Step 1</div>
+                      <h3>분석된 리스크 요인</h3>
+                    </div>
+                    <div className="risk-horizontal-scroll">
+                      {risks.map((r, i) => (
+                        <div key={i} className="flow-risk-card">
+                          <h4>{r["리스크 요인"]}</h4>
+                          <p>{r["세부 내용"]}</p>
+                          <div className="evidence">근거: {r["관련 근거"]}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="analysis-step">
+                  <div className="step-header">
+                    <div className="step-num">Step 2</div>
+                    <h3>최종 예상 질문 및 대응 방향</h3>
+                  </div>
+                  
+                  <div className="questions-grid">
+                    {questions.length === 0 ? (
+                      <div className="empty-state">
+                        <HelpCircle size={48} className="empty-icon" />
+                        <p>추출된 예상 질문이 없습니다.<br/>[리스크 추출] 후 [질문 및 답변 생성]을 진행하세요.</p>
+                      </div>
+                    ) : (
+                      questions.map((q, i) => (
+                        <div key={i} className="premium-question-card">
+                          <div className="q-badge">질문 {i+1}</div>
+                          <div className="q-content">
+                            <h4 className="question-text">{q["예상 질문"] || q["질문"]}</h4>
+                            <div className="answer-section">
+                              <div className="label">대응 및 답변 방향</div>
+                              <p className="answer-text">{q["답변 방향"] || q["대응방안"] || q["답변"]}</p>
+                            </div>
+                            <div className="q-meta">
+                              <span>관련 쟁점: {q["관련 리스크"] || "-"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1012,18 +1073,49 @@ function App() {
         .refresh-mini-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
         .refresh-mini-btn:hover { color: var(--primary); }
 
-        .mini-news-list { padding: 0.75rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; }
-        .mini-news-card {
-          padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--border);
-          text-decoration: none; color: inherit; transition: all 0.2s; display: flex; flex-direction: column; gap: 0.25rem;
+        .news-feed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1rem; }
+        .premium-news-card {
+          background: white; border: 1px solid var(--border); border-radius: 1rem; padding: 1.25rem;
+          text-decoration: none; color: inherit; transition: all 0.2s; position: relative;
+          display: flex; flex-direction: column; gap: 0.75rem;
         }
-        .mini-news-card:hover { border-color: var(--primary); background: #fdfdff; transform: translateX(3px); }
-        .mini-news-card .date { font-size: 0.7rem; color: var(--text-muted); }
-        .mini-news-card .title { font-size: 0.85rem; font-weight: 700; line-height: 1.4; color: var(--text); }
-        .mini-news-card p { font-size: 0.8rem; color: var(--text-muted); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .premium-news-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); border-color: var(--primary); }
+        .news-badge { position: absolute; top: 1rem; right: 1rem; font-size: 0.65rem; font-weight: 800; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; color: var(--text-muted); }
+        .news-title { font-size: 1rem; font-weight: 700; line-height: 1.4; color: var(--text); padding-right: 3rem; margin: 0; }
+        .news-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
+        .news-meta { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem; border-top: 1px solid #f8fafc; color: var(--primary); font-size: 0.75rem; font-weight: 600; }
 
-        .section-title-sm { font-size: 0.9rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.75rem; }
-        .empty-state-sm { padding: 2rem 1rem; text-align: center; font-size: 0.85rem; color: var(--text-muted); }
+        .mini-risk-card { padding: 0.75rem; border-radius: 0.75rem; background: #fffafb; border: 1px solid #fee2e2; margin-bottom: 0.75rem; }
+        .risk-title { font-size: 0.85rem; font-weight: 800; color: #b91c1c; margin-bottom: 0.25rem; }
+        .risk-body { font-size: 0.8rem; color: #7f1d1d; line-height: 1.4; }
+
+        .questions-flow { display: flex; flex-direction: column; gap: 2.5rem; }
+        .analysis-step { display: flex; flex-direction: column; gap: 1rem; }
+        .step-header { display: flex; align-items: center; gap: 0.75rem; border-bottom: 2px solid var(--primary-light); padding-bottom: 0.5rem; }
+        .step-num { background: var(--primary); color: white; font-size: 0.7rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; text-transform: uppercase; }
+        .step-header h3 { font-size: 1.15rem; font-weight: 800; color: var(--text); margin: 0; }
+
+        .risk-horizontal-scroll { display: flex; gap: 1rem; overflow-x: auto; padding: 0.5rem 0; scrollbar-width: thin; }
+        .flow-risk-card { 
+          min-width: 300px; max-width: 300px; background: #fffafb; border: 1px solid #fee2e2; border-radius: 1rem; padding: 1.25rem;
+          display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        .flow-risk-card h4 { font-size: 0.95rem; font-weight: 800; color: #b91c1c; margin: 0; }
+        .flow-risk-card p { font-size: 0.85rem; color: #7f1d1d; line-height: 1.5; margin: 0; }
+        .flow-risk-card .evidence { font-size: 0.75rem; color: #991b1b; font-weight: 600; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #fecaca; }
+
+        .questions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(450px, 1fr)); gap: 1.5rem; }
+        .premium-question-card { 
+          background: white; border: 1px solid var(--border); border-radius: 1.25rem; padding: 1.5rem;
+          display: flex; flex-direction: column; gap: 1rem; box-shadow: var(--shadow); transition: all 0.2s;
+        }
+        .premium-question-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); border-color: var(--primary); }
+        .q-badge { align-self: flex-start; background: var(--primary-light); color: var(--primary); font-size: 0.7rem; font-weight: 800; padding: 2px 10px; border-radius: 6px; }
+        .question-text { font-size: 1.1rem; font-weight: 800; color: var(--text); line-height: 1.4; margin: 0; }
+        .answer-section { background: #f8fafc; border-radius: 0.75rem; padding: 1rem; border-left: 4px solid var(--primary); }
+        .answer-section .label { font-size: 0.7rem; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 0.5rem; }
+        .answer-text { font-size: 0.95rem; color: #334155; line-height: 1.6; margin: 0; }
+        .q-meta { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; display: flex; justify-content: flex-end; }
 
         @media (max-width: 1024px) {
           .risks-layout { grid-template-columns: 1fr; }
