@@ -635,9 +635,21 @@ function App() {
           z-index: -1;
         }
 
-        .container { max-width: 1400px; margin: 0 auto; padding: 0 1rem; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; width: 100%; box-sizing: border-box; }
 
-        /* Header & Nav */
+           /* Modal Premium Enhancements */
+        .modal-overlay {
+          background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(4px);
+          display: flex; align-items: center; justify-content: center; z-index: 1000;
+          position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        }
+        .detail-modal {
+          background: #ffffff; width: 95%; max-width: 850px;
+          max-height: 85vh; overflow-y: auto; border-radius: 1.25rem;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+          animation: modalSlideUp 0.3s ease-out;
+          position: relative; border: 1px solid rgba(0,0,0,0.1);
+        }
         .main-header {
           position: fixed; top: 0; left: 0; right: 0;
           background: rgba(255, 255, 255, 0.9);
@@ -680,7 +692,7 @@ function App() {
         /* Modal & Settings */
         .modal-overlay {
           position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px);
+          background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px);
           display: flex; align-items: center; justify-content: center;
           z-index: 2000; animation: fadeIn 0.3s ease;
         }
@@ -746,8 +758,8 @@ function App() {
         .refresh-btn:hover { background: #f1f5f9; }
 
         .stats-grid { 
-          display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); 
-          gap: 1.5rem; margin-bottom: 3rem;
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+          gap: 1.25rem; margin-bottom: 2.5rem;
         }
         .stat-card {
           background: var(--card); padding: 1.5rem; border-radius: 1.25rem;
@@ -936,7 +948,7 @@ function App() {
 
           background: linear-gradient(to right, #fcfdfe, #ffffff);
         }
-        .card-body { padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
+        .card-body { padding: 1rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         
         .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
         .info-group label { 
@@ -947,8 +959,8 @@ function App() {
         .info-group.danger p { color: var(--danger); font-weight: 600; }
 
         .summary-text { 
-          background: #f8fafc; padding: 0.5rem; border-radius: 0.4rem; 
-          border: 1px dashed var(--border); font-size: 0.8rem; line-height: 1.5;
+          background: #f8fafc; padding: 0.75rem 1rem; border-radius: 0.5rem; 
+          border: 1px solid #e2e8f0; font-size: 0.85rem; line-height: 1.6; color: #334155;
         }
 
         .card-footer-action { padding: 0.4rem 0.75rem 0.8rem; display: flex; justify-content: flex-end; }
