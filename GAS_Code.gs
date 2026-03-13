@@ -116,21 +116,33 @@ function fetchNewsFromNaver() {
   if (!CLIENT_ID || !CLIENT_SECRET) return { ok: false, error: "네이버 API 설정이 필요합니다." };
 
   const query = "서울신용보증재단";
-  let allItems = [];
-  
-  // 최대 10페이지만 수집 (총 1000건 시도)
-  for (let i = 0; i < 10; i++) {
-    const start = (i * 100) + 1;
-    const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=${start}&sort=date`;
-    const response = UrlFetchApp.fetch(url, {
-      headers: { "X-Naver-Client-Id": CLIENT_ID, "X-Naver-Client-Secret": CLIENT_SECRET },
-      muteHttpExceptions: true
-    });
-    if (response.getResponseCode() !== 200) break;
-    const data = JSON.parse(response.getContentText());
-    if (!data.items || data.items.length === 0) break;
-    allItems = allItems.concat(data.items);
-  }
+  const allItems = [];
+  const searchUrls = [
+    `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=1&sort=sim`,
+    `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=1&sort=date`,
+    `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=101&sort=sim`
+  ];
+
+  const headers = {
+    "X-Naver-Client-Id": CLIENT_ID,
+    "X-Naver-Client-Secret": CLIENT_SECRET
+  };
+
+  searchUrls.forEach(url => {
+    try {
+      const response = UrlFetchApp.fetch(url, { headers, muteHttpExceptions: true });
+      if (response.getResponseCode() === 200) {
+        const data = JSON.parse(response.getContentText());
+        if (data.items) allItems.push(...data.items);
+      } else {
+        console.warn(`Naver API Fetch Error for URL: ${url}, Response Code: ${response.getResponseCode()}, Content: ${response.getContentText()}`);
+      }
+    } catch (e) {
+      console.error("Naver API Fetch Error: " + e.message);
+    }
+  });
+
+  if (allItems.length === 0) return { ok: false, error: "뉴스를 가져오지 못했습니다." };
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
@@ -142,15 +154,21 @@ function fetchNewsFromNaver() {
     sheet.clear().appendRow(['날짜', '언론사', '제목', '요약', '링크', '수집일']);
   }
   const existingLinks = sheet.getRange("E:E").getValues().flat().map(String);
+  const existingTitles = sheet.getRange("C:C").getValues().flat().map(String);
   
-  const newNews = allItems.filter(item => !existingLinks.includes(item.originallink || item.link))
+  const newNews = allItems.filter(item => {
+                          const link = item.originallink || item.link;
+                          const title = item.title.replace(/<[^>]+>/g, "");
+                          return !existingLinks.includes(link) && !existingTitles.includes(title);
+                        })
                         .map(item => ({
                           date: Utilities.formatDate(new Date(item.pubDate), "GMT+9", "yyyy-MM-dd"),
                           source: "뉴스",
                           title: item.title.replace(/<[^>]+>/g, ""),
                           desc: item.description.replace(/<[^>]+>/g, ""),
                           link: item.originallink || item.link
-                        }));
+                        }))
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // 최신순 정렬
 
   if (newNews.length === 0) return { ok: true, message: "새로운 뉴스가 없습니다.", count: 0 };
 
@@ -161,9 +179,9 @@ function fetchNewsFromNaver() {
   const finalNews = crawlNewsContent(cleanedNews.slice(0, 100));
 
   if (finalNews.length > 0) {
-    const lastRow = sheet.getLastRow();
-    const rows = finalNews.map(n => [n.date, n.source, n.title, n.desc, n.link, Utilities.formatDate(new Date(), "GMT+9", "yyyy-MM-dd")]);
-    sheet.getRange(lastRow + 1, 1, rows.length, 6).setValues(rows);
+    const rows = finalNews.map(n => [n.date, n.source, n.title, n.desc, n.link, Utilities.formatDate(new Date(), "GMT+9", "yyyy-MM-dd HH:mm")]);
+    sheet.insertRowsAfter(1, rows.length); // 헤더 아래에 새 행 삽입
+    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
   }
 
   return { ok: true, count: finalNews.length };
@@ -177,8 +195,12 @@ function crawlNewsContent(newsList) {
       if (response.getResponseCode() === 200) {
         const html = response.getContentText();
         // Gemini에게 본문 추출 요청
-        const cleanContent = extractTextWithAI(html, API_KEY);
-        if (cleanContent) item.desc = cleanContent;
+        const res = extractTextWithAI(html, API_KEY, item.title);
+        if (res && res.length > 100) { // 100자 이상일 경우에만 업데이트
+          item.desc = res;
+        }
+      } else {
+        console.warn(`크롤링 실패: ${item.link}, 응답 코드: ${response.getResponseCode()}`);
       }
     } catch (e) {
       console.warn("크롤링 실패:", item.link, e.message);
@@ -187,14 +209,15 @@ function crawlNewsContent(newsList) {
   });
 }
 
-function extractTextWithAI(html, apiKey) {
+function extractTextWithAI(html, apiKey, title) {
   if (!apiKey) return null;
-  const prompt = `다음 HTML 본문에서 뉴스 기사의 본문 텍스트만 추출해서 500자 내외로 요약해줘. 홍보 문구나 불필요한 태그는 제외해.\n\n[HTML]\n${html.substring(0, 15000)}`;
+  const prompt = `뉴스 제목: ${title}\n\n이 뉴스 기사의 본문 텍스트만 추출하여 500자 내외로 상세히 요약해줘. 홍보 문구나 불필요한 광고, 태그는 완전히 제외하고 기사의 본문 내용만 요약해.\n\n[HTML 본문]\n${html.substring(0, 15000)}`;
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
     const resp = UrlFetchApp.fetch(url, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload) });
-    return JSON.parse(resp.getContentText()).candidates[0].content.parts[0].text;
+    const content = JSON.parse(resp.getContentText());
+    return content.candidates[0].content.parts[0].text;
   } catch (e) { return null; }
 }
 

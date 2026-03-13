@@ -424,8 +424,8 @@ function App() {
                     {personas.map((p, i) => (
                       <div key={i} className="content-card persona">
                         <div className="card-top">
-                          <span className="party-badge">{p.지역구 || p.소속 || "지역구 미지정"}</span>
                           <span className="name">{p.의원명 || p.이름} 의원</span>
+                          <span className="party-badge">{p.지역구 || p.소속 || "지역구 미지정"}</span>
                         </div>
                         <div className="card-body">
                           <div className="info-row">
@@ -448,8 +448,8 @@ function App() {
                           </div>
                         </div>
                         <div className="card-footer-action">
-                          <button className="card-more-btn" onClick={() => setSelectedPersona(p)}>
-                            상세보기 <ChevronRight size={14} />
+                          <button className="premium-more-btn" onClick={() => setSelectedPersona(p)}>
+                            상세 분석 리포트 <ArrowUpRight size={14} />
                           </button>
                         </div>
                       </div>
@@ -635,7 +635,7 @@ function App() {
           z-index: -1;
         }
 
-        .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 0 1rem; }
 
         /* Header & Nav */
         .main-header {
@@ -934,34 +934,32 @@ function App() {
           border-color: var(--primary);
         }
 
-        .card-top { 
-          padding: 1.25rem; border-bottom: 1px solid var(--border);
-          display: flex; justify-content: space-between; align-items: center;
-          background: linear-gradient(to right, #f8fafc, #ffffff);
+          background: linear-gradient(to right, #fcfdfe, #ffffff);
         }
-        .card-body { padding: 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+        .card-body { padding: 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.6rem; }
         
-        .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+        .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
         .info-group label { 
-          display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); 
-          text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;
+          display: block; font-size: 0.65rem; font-weight: 700; color: var(--text-muted); 
+          text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem;
         }
-        .info-group p { margin: 0; font-size: 0.9rem; font-weight: 500; color: var(--text); }
+        .info-group p { margin: 0; font-size: 0.85rem; font-weight: 500; color: var(--text); }
         .info-group.danger p { color: var(--danger); font-weight: 600; }
 
         .summary-text { 
-          background: #f8fafc; padding: 0.6rem; border-radius: 0.4rem; 
-          border: 1px dashed var(--border); font-size: 0.85rem; line-height: 1.5;
+          background: #f8fafc; padding: 0.5rem; border-radius: 0.4rem; 
+          border: 1px dashed var(--border); font-size: 0.8rem; line-height: 1.5;
         }
 
-        .card-footer-action { padding: 0.5rem 1rem 1rem; display: flex; justify-content: flex-end; }
-        .card-more-btn {
-          background: transparent; color: var(--primary); border: none;
-          font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.6rem;
-          display: flex; align-items: center; gap: 0.2rem; cursor: pointer;
-          border-radius: 4px; transition: all 0.2s;
+        .card-footer-action { padding: 0.4rem 0.75rem 0.8rem; display: flex; justify-content: flex-end; }
+        .premium-more-btn {
+          background: var(--primary); color: white; border: none;
+          font-size: 0.8rem; font-weight: 600; padding: 0.5rem 0.9rem;
+          display: flex; align-items: center; gap: 0.4rem; cursor: pointer;
+          border-radius: 6px; transition: all 0.2s;
+          box-shadow: 0 2px 5px rgba(79, 70, 229, 0.2);
         }
-        .card-more-btn:hover { background: var(--primary-light); }
+        .premium-more-btn:hover { background: #4338ca; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3); }
 
         /* Risks Layout */
         .risks-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; margin-top: 1rem; }
