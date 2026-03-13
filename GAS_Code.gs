@@ -38,6 +38,7 @@ function doGet(e) {
         personas: getTabData(ss, '의원별 관심사'),
         risks: getTabData(ss, '리스크 요인'),
         questions: getTabData(ss, '예상 질문'),
+        news: getTabData(ss, '최근 뉴스'),
         news_count: getTabRowCount(ss, '최근 뉴스') - 1
       });
     }
@@ -113,38 +114,79 @@ function fetchNewsFromNaver() {
   if (!CLIENT_ID || !CLIENT_SECRET) return { ok: false, error: "네이버 API 설정이 필요합니다." };
 
   const query = "서울신용보증재단";
-  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&sort=date`;
+  let allItems = [];
   
-  const response = UrlFetchApp.fetch(url, {
-    headers: { "X-Naver-Client-Id": CLIENT_ID, "X-Naver-Client-Secret": CLIENT_SECRET }
-  });
-  const items = JSON.parse(response.getContentText()).items;
-  
+  // 최대 5페이지만 수집 (총 500건으로 제한하되, 양을 늘림)
+  for (let i = 0; i < 5; i++) {
+    const start = (i * 100) + 1;
+    const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=${start}&sort=sim`;
+    const response = UrlFetchApp.fetch(url, {
+      headers: { "X-Naver-Client-Id": CLIENT_ID, "X-Naver-Client-Secret": CLIENT_SECRET },
+      muteHttpExceptions: true
+    });
+    if (response.getResponseCode() !== 200) break;
+    const data = JSON.parse(response.getContentText());
+    if (!data.items || data.items.length === 0) break;
+    allItems = allItems.concat(data.items);
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
-  const existingLinks = sheet.getRange("E:E").getValues().flat();
+  const existingLinks = sheet.getRange("E:E").getValues().flat().map(String);
   
-  const newNews = items.filter(item => !existingLinks.includes(item.originallink || item.link))
-                       .map(item => ({
-                         date: Utilities.formatDate(new Date(item.pubDate), "GMT+9", "yyyy-MM-dd"),
-                         source: item.originallink ? "언론사" : "네이버",
-                         title: item.title.replace(/<[^>]+>/g, ""),
-                         desc: item.description.replace(/<[^>]+>/g, ""),
-                         link: item.originallink || item.link
-                       }));
+  const newNews = allItems.filter(item => !existingLinks.includes(item.originallink || item.link))
+                        .map(item => ({
+                          date: Utilities.formatDate(new Date(item.pubDate), "GMT+9", "yyyy-MM-dd"),
+                          source: "뉴스",
+                          title: item.title.replace(/<[^>]+>/g, ""),
+                          desc: item.description.replace(/<[^>]+>/g, ""),
+                          link: item.originallink || item.link
+                        }));
 
   if (newNews.length === 0) return { ok: true, message: "새로운 뉴스가 없습니다.", count: 0 };
 
   // Gemini를 이용한 중복 제거 및 중요도 필터링
   const cleanedNews = cleanNewsWithAI(newNews);
   
-  if (cleanedNews.length > 0) {
+  // 선별된 뉴스에 대해 본문 크롤링 시도 (상위 20개만)
+  const finalNews = crawlNewsContent(cleanedNews.slice(0, 20));
+
+  if (finalNews.length > 0) {
     const lastRow = sheet.getLastRow();
-    const rows = cleanedNews.map(n => [n.date, n.source, n.title, n.desc, n.link, Utilities.formatDate(new Date(), "GMT+9", "yyyy-MM-dd")]);
+    const rows = finalNews.map(n => [n.date, n.source, n.title, n.desc, n.link, Utilities.formatDate(new Date(), "GMT+9", "yyyy-MM-dd")]);
     sheet.getRange(lastRow + 1, 1, rows.length, 6).setValues(rows);
   }
 
-  return { ok: true, count: cleanedNews.length };
+  return { ok: true, count: finalNews.length };
+}
+
+function crawlNewsContent(newsList) {
+  const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
+  return newsList.map(item => {
+    try {
+      const response = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, followRedirects: true, timeout: 5000 });
+      if (response.getResponseCode() === 200) {
+        const html = response.getContentText();
+        // Gemini에게 본문 추출 요청
+        const cleanContent = extractTextWithAI(html, API_KEY);
+        if (cleanContent) item.desc = cleanContent;
+      }
+    } catch (e) {
+      console.warn("크롤링 실패:", item.link, e.message);
+    }
+    return item;
+  });
+}
+
+function extractTextWithAI(html, apiKey) {
+  if (!apiKey) return null;
+  const prompt = `다음 HTML 본문에서 뉴스 기사의 본문 텍스트만 추출해서 500자 내외로 요약해줘. 홍보 문구나 불필요한 태그는 제외해.\n\n[HTML]\n${html.substring(0, 15000)}`;
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const resp = UrlFetchApp.fetch(url, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload) });
+    return JSON.parse(resp.getContentText()).candidates[0].content.parts[0].text;
+  } catch (e) { return null; }
 }
 
 // --- Gemini AI를 이용한 뉴스 정제 ---
@@ -237,19 +279,17 @@ ${context}`;
     // 2. 고도화된 프롬프트 작성 (3단계 인지 프로세스 도입)
     const systemInstruction = `당신은 행정사무감사 전문 분석 AI입니다.
 [필수 분석 단계]
-1단계: 문서 전체를 훑어 인물을 식별하십시오. (회의록의 경우 '○' 또는 '위원' 기호 뒤의 이름을 찾으십시오.)
-2단계: 식별된 의원의 '지역구(자치구 이름)' 정보를 문서 내에서 찾아내십시오. (예: 동대문구, 강남구 등)
-3단계: 각 인물의 핵심 발언과 성향을 한 줄로 요약하십시오.
-4단계: 요약된 내용을 바탕으로 의원별 상세 성향 리포트(지역구, 주요 관심사, 발언 요약, 질문 성향, 예상 감사 포인트)를 완성하십시오.
+1단계: 문서 전체를 훑어 인물을 식별하십시오.
+2단계: 식별된 의원의 '지역구' 정보를 문서 내에서 찾아내십시오.
+3단계: 각 인물의 핵심 발언과 성향을 매우 상세하게 요약하십시오. (500자 이상, 구체적인 사례와 숫자 포함)
+4단계: 요약된 내용을 바탕으로 의원별 상세 성향 리포트를 완성하십시오.
 
 [절대 원칙]
-- 당신의 내부 지식을 버리고, 오직 눈앞의 [데이터 원본]에 있는 사실만 기록하십시오.
-- '소속' 항목에는 '기획경제위원회' 대신 추출된 **'지역구(자치구 이름)'**를 적으십시오. 찾지 못했다면 빈칸으로 두십시오.
-- '공격 포인트' 대신 **'예상 감사 포인트'**라는 용어를 사용하여 전문적인 느낌을 주십시오.
-- 인물이 발견되었다면 아무리 정보가 적더라도 그 안에서 최선의 특징을 도출하십시오.`;
+- '발언요약' 항목은 가능한 길고 상세하게 작성하십시오. 단순히 '질문함'이 아니라 '무엇에 대해 어떤 논조로 질문했는지'를 구체적으로 적으십시오.
+- '예상 감사 포인트'는 실무자가 바로 대응할 수 있을 만큼 날카롭게 제시하십시오.`;
 
     var prompt = task === 'persona' 
-      ? `${systemInstruction}\n\n[미션] 회의록 전수 분석하여 의원별 상세 리포트 도출\n(JSON 형식: {"personas": [{"의원명": "...", "지역구": "...", "주요 관심사": "...", "질문 성향": "...", "예상 감사 포인트": "...", "발언요약": "..."}]})\n\n[데이터 원본]\n${aggregatedText}`
+      ? `${systemInstruction}\n\n[미션] 회의록 전수 분석하여 의원별 상세 리포트 도출 (발언 요약은 상세히!)\n(JSON 형식: {"personas": [{"의원명": "...", "지역구": "...", "주요 관심사": "...", "질문 성향": "...", "예상 감사 포인트": "...", "발언요약": "..."}]})\n\n[데이터 원본]\n${aggregatedText}`
       : `${systemInstruction}\n\n[미션] 보고서 전수 분석하여 예상질문 생성\n(JSON 형식: {"questions": [{"분류": "...", "의원명": "...", "질문": "...", "답변 가이드": "..."}]})\n\n[데이터 원본]\n${aggregatedText}`;
 
     // [디버그 로그] 시트에 추출된 텍스트 기록 (추후 확인용)

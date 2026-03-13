@@ -4,7 +4,7 @@ import {
   FileText, Search, AlertTriangle, HelpCircle, 
   Upload, RefreshCw, Database, Users, CheckCircle2,
   Menu, X, ChevronRight, LayoutDashboard, UserCheck, ShieldAlert, MessageSquare,
-  Settings, ArrowUpRight, Trash2
+  Settings, ArrowUpRight, Trash2, Newspaper, ExternalLink, Star, User
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -63,7 +63,9 @@ function App() {
   const [personas, setPersonas] = useState([]);
   const [risks, setRisks] = useState([]);
   const [questions, setQuestions] = useState([]);
+  const [news, setNews] = useState([]);
   const [newsCount, setNewsCount] = useState(0);
+  const [selectedPersona, setSelectedPersona] = useState(null);
   const [minutesFiles, setMinutesFiles] = useState([]);
   const [reportFiles, setReportFiles] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -80,6 +82,7 @@ function App() {
       setPersonas(res.data.personas || []);
       setRisks(res.data.risks || []);
       setQuestions(res.data.questions || []);
+      setNews(res.data.news || []);
       setNewsCount(res.data.news_count || 0);
 
       const mRes = await axios.get(`${API_BASE}?action=listFiles&type=minutes&token=${passcode}`);
@@ -340,6 +343,9 @@ function App() {
               <button className={activeTab === 'questions' ? 'active' : ''} onClick={() => setActiveTab('questions')}>
                 <MessageSquare size={18} /> <span>예상 질문</span>
               </button>
+              <button className={activeTab === 'news' ? 'active' : ''} onClick={() => setActiveTab('news')}>
+                <Newspaper size={18} /> <span>최근 뉴스</span>
+              </button>
             </nav>
           </div>
         </div>
@@ -420,27 +426,32 @@ function App() {
                     {personas.map((p, i) => (
                       <div key={i} className="content-card persona">
                         <div className="card-top">
-                          <span className="name">{p.의원명 || p.이름} 의원</span>
                           <span className="party-badge">{p.지역구 || p.소속 || "지역구 미지정"}</span>
+                          <span className="name">{p.의원명 || p.이름} 의원</span>
                         </div>
                         <div className="card-body">
-                          <div className="info-group">
-                            <label>주요 관심사</label>
-                            <p>{p["주요 관심사"] || p["관심사"] || p["주요 관심 포인트"] || "-"}</p>
+                          <div className="info-row">
+                            <div className="info-group">
+                              <label>주요 관심사</label>
+                              <p className="line-clamp-1">{p["주요 관심사"] || p["관심사"] || p["주요 관심 포인트"] || "-"}</p>
+                            </div>
+                            <div className="info-group">
+                              <label>질문 성향</label>
+                              <p className="line-clamp-1">{p["질문 성향"] || p["성향"] || p["스타일"] || p["질문 스타일"] || "-"}</p>
+                            </div>
                           </div>
                           <div className="info-group">
-                            <label>질문 성향</label>
-                            <p>{p["질문 성향"] || p["성향"] || p["스타일"] || p["질문 스타일"] || "-"}</p>
-                          </div>
-                          <div className="info-group">
-                            <label>발언 요약</label>
-                            <p className="summary-text">{p["발언 요약"] || p["발언요약"] || "-"}</p>
+                            <label>상세 발언 요약</label>
+                            <p className="summary-text line-clamp-3">{p["발언 요약"] || p["발언요약"] || "-"}</p>
                           </div>
                           <div className="info-group danger">
-                            <label>예상 감사 포인트</label>
-                            <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || p["예상 공격 전략"] || "-"}</p>
+                            <label>핵심 감사 포인트</label>
+                            <p className="line-clamp-2">{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || p["예상 공격 전략"] || "-"}</p>
                           </div>
                         </div>
+                        <button className="card-more-btn" onClick={() => setSelectedPersona(p)}>
+                          상세보기 <ChevronRight size={14} />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -497,58 +508,86 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'questions' && (
+          {activeTab === 'news' && (
             <div className="view-tab fade-in">
               <div className="section-header">
                 <div className="title-row">
-                  <MessageSquare size={24} className="title-icon" />
-                  <h2>최종 관문: 예상 질문 및 대응</h2>
+                  <Newspaper size={24} className="title-icon" />
+                  <h2>수집된 최근 뉴스 목록</h2>
                 </div>
-                <button className="action-btn primary" onClick={() => handleAction('questions')}>
-                  <HelpCircle size={18} /> 답변 시나리오 생성
+                <button className="action-btn" onClick={fetchNews}>
+                  <RefreshCw size={16} /> 뉴스 수집 실행
                 </button>
               </div>
               
-              <div className="layout-with-sidebar">
-                <div className="main-content">
-                  <div className="qa-list">
-                    {questions.map((q, i) => (
-                      <div key={i} className="qa-card">
-                        <div className="qa-header">
-                          <span className="tag">{q["분류"] || `질문 ${i+1}`}</span>
-                          <span className="meta">{q.의원명} 의원</span>
-                        </div>
-                        <div className="qa-body">
-                          <div className="q-box">
-                            <span className="label">Q</span>
-                            <div className="txt">{q.질문}</div>
-                          </div>
-                          <div className="a-box">
-                            <span className="label">A</span>
-                            <div className="txt">{q["답변 가이드"] || q["답변(모범답안)"]}</div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {questions.length === 0 && (
-                    <div className="empty-state">생성된 질문 시나리오가 없습니다.</div>
-                  )}
-                </div>
-                <aside className="sidebar">
-                  <MiniFileManager 
-                    files={reportFiles} 
-                    type="report" 
-                    label="재단 업무보고서" 
-                    onUpload={handleFileUpload} 
-                    onDelete={handleDeleteFile}
-                  />
-                </aside>
+              <div className="news-list-grid">
+                {news.map((item, i) => (
+                  <a key={i} href={item.link || item.링크} target="_blank" rel="noreferrer" className="news-item-card">
+                    <div className="news-date">{item.date || item.날짜}</div>
+                    <h3 className="news-title">{item.title || item.제목}</h3>
+                    <p className="news-desc">{item.desc || item.본문내용 || item.내용 || "내용 요약 중..."}</p>
+                    <div className="news-footer">
+                      <span className="source-tag">{item.source || item.언론사 || "뉴스"}</span>
+                      <ExternalLink size={12} />
+                    </div>
+                  </a>
+                ))}
+                {news.length === 0 && (
+                  <div className="empty-state">수집된 뉴스가 없습니다. '뉴스 수집'을 실행해 주세요.</div>
+                )}
               </div>
             </div>
           )}
         </div>
       </main>
+
+      {/* 상세보기 모달 */}
+      {selectedPersona && (
+        <div className="modal-overlay fade-in" onClick={() => setSelectedPersona(null)}>
+          <div className="modal-content detail-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="persona-title">
+                <span className="name">{selectedPersona.의원명 || selectedPersona.이름} 의원</span>
+                <span className="party-badge">{selectedPersona.지역구 || selectedPersona.소속}</span>
+              </div>
+              <button className="close-btn" onClick={() => setSelectedPersona(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="detail-section">
+                <label><Star size={14} /> 주요 관심 영역</label>
+                <div className="tag-cloud">
+                  {(selectedPersona["주요 관심사"] || selectedPersona["관심사"] || "").split(',').map((t, i) => (
+                    <span key={i} className="interest-tag">{t.trim()}</span>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="detail-grid">
+                <div className="detail-section">
+                  <label><User size={14} /> 질문 및 상담 성향</label>
+                  <p>{selectedPersona["질문 성향"] || selectedPersona["성향"] || "-"}</p>
+                </div>
+                <div className="detail-section danger">
+                  <label><AlertTriangle size={14} /> 핵심 감사 포인트</label>
+                  <p>{selectedPersona["예상 감사 포인트"] || selectedPersona["감사 포인트"] || "-"}</p>
+                </div>
+              </div>
+
+              <div className="detail-section full">
+                <label><MessageSquare size={14} /> 상세 발언 기록 및 요약</label>
+                <div className="long-text">
+                  {selectedPersona["발언 요약"] || selectedPersona["발언요약"] || "기록된 발언이 없습니다."}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-primary" onClick={() => setSelectedPersona(null)}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 상태 토스트 */}
       {status && (
@@ -880,6 +919,55 @@ function App() {
           .nav-menu span { display: none; }
           .brand-text .sub { display: none; }
         }
+        .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+        .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .card-more-btn {
+          width: 100%; padding: 0.75rem; background: var(--primary-light);
+          color: var(--primary); border: none; font-weight: 600;
+          display: flex; align-items: center; justify-content: center; gap: 0.25rem;
+          transition: all 0.2s;
+        }
+        .card-more-btn:hover { background: var(--primary); color: white; }
+
+        /* News List */
+        .news-list-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1rem; }
+        .news-item-card {
+          background: white; border-radius: 1rem; padding: 1.5rem; text-decoration: none; color: inherit;
+          border: 1px solid var(--border); transition: all 0.3s; display: flex; flex-direction: column; gap: 0.5rem;
+        }
+        .news-item-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); border-color: var(--primary); }
+        .news-date { font-size: 0.8rem; color: var(--text-muted); }
+        .news-title { font-size: 1.1rem; font-weight: 700; color: var(--text); margin: 0; }
+        .news-desc { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        .news-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .source-tag { font-size: 0.75rem; font-weight: 600; color: var(--primary); background: var(--primary-light); padding: 0.2rem 0.6rem; border-radius: 20px; }
+
+        /* Modal Extensions */
+        .detail-modal { max-width: 800px; width: 95%; }
+        .persona-title { display: flex; flex-direction: column; }
+        .persona-title .name { font-size: 1.5rem; font-weight: 800; color: var(--text); }
+        .persona-title .party-badge { margin-top: 0.25rem; font-size: 0.9rem; width: fit-content; }
+        
+        .detail-section { margin-bottom: 2rem; }
+        .detail-section label { 
+          display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; 
+          font-weight: 700; color: var(--primary); margin-bottom: 0.75rem;
+        }
+        .detail-section p { font-size: 1rem; color: var(--text); background: #f8fafc; padding: 1rem; border-radius: 0.5rem; line-height: 1.7; }
+        .detail-section.danger p { border-left: 4px solid var(--danger); }
+        .detail-section.full .long-text { 
+           white-space: pre-wrap; background: #f8fafc; padding: 1.5rem; 
+           border-radius: 0.5rem; line-height: 1.8; font-size: 1.05rem;
+           border: 1px solid var(--border); min-height: 200px;
+        }
+        .tag-cloud { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .interest-tag { background: white; border: 1px solid var(--primary); color: var(--primary); padding: 0.4rem 0.8rem; border-radius: 2rem; font-size: 0.85rem; font-weight: 600; }
+        
+        .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        @media (max-width: 768px) { .detail-grid { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );
