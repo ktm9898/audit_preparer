@@ -109,6 +109,27 @@ function doPost(e) {
   }
 }
 
+// --- 신뢰할 수 있는 매체 리스트 ---
+const TRUSTED_DOMAINS = [
+  'chosun.com', 'joongang.co.kr', 'donga.com', 'hani.co.kr', 'khan.co.kr', 
+  'seoul.co.kr', 'segye.com', 'hankookilbo.com', 'kmib.co.kr', 'munhwa.com',
+  'yna.co.kr', 'newsis.com', 'news1.kr',
+  'kbs.co.kr', 'mbc.co.kr', 'sbs.co.kr', 'jtbc.co.kr', 'ytn.co.kr', 'mbn.co.kr', 'tvchosun.com', 'ichannela.com',
+  'hankyung.com', 'mk.co.kr', 'mt.co.kr', 'edaily.co.kr', 'sedaily.com', 'fnnews.com', 'heraldcorp.com', 'asiae.co.kr', 'ajunews.com'
+];
+
+function isTrustedMedia(url) {
+  if (!url) return false;
+  try {
+    const domain = url.split('/')[2].replace('www.', '').replace('m.', '');
+    return TRUSTED_DOMAINS.some(d => domain === d || domain.endsWith('.' + d));
+  } catch (e) { return false; }
+}
+
+function getGeminiModel() {
+  return "gemini-3-flash-preview"; 
+}
+
 // --- 핵심 로직: 네이버 뉴스 수집 ---
 function fetchNewsFromNaver() {
   const CLIENT_ID = PROPS.getProperty('NAVER_CLIENT_ID');
@@ -161,7 +182,8 @@ function fetchNewsFromNaver() {
   const newNews = allItems.filter(item => {
                           const link = item.originallink || item.link;
                           const title = item.title.replace(/<[^>]+>/g, "");
-                          return !existingLinks.includes(link) && !existingTitles.includes(title);
+                          // 1. 중복 제거 2. 주요 언론사 필터링
+                          return !existingLinks.includes(link) && !existingTitles.includes(title) && isTrustedMedia(link);
                         })
                         .map(item => ({
                           date: Utilities.formatDate(new Date(item.pubDate), "GMT+9", "yyyy-MM-dd"),
@@ -169,20 +191,30 @@ function fetchNewsFromNaver() {
                           source: "뉴스",
                           title: item.title.replace(/<[^>]+>/g, ""),
                           naverDesc: item.description.replace(/<[^>]+>/g, ""),
-                          fullText: "", // 크롤링 전
+                          fullText: "", 
                           link: item.originallink || item.link,
-                          aiSummary: "", // 크롤링/요약 전
+                          aiSummary: "", 
                           importance: "-"
                         }))
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // 최신순 정렬
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   if (newNews.length === 0) return { ok: true, message: "새로운 뉴스가 없습니다.", count: 0 };
 
-  // AI 필터링을 조금 더 넉넉하게 가져가거나, 일단 다 가져온 뒤 크롤링
-  const cleanedNews = cleanNewsWithAI(newNews);
+  // --- 3단계 AI 파이프라인 시작 ---
+  const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
+
+  // Stage 1: 스크리닝 (중복 제거 & 중요 뉴스 선별)
+  console.log("Stage 1 시작: 뉴스 선별 및 중복 제거...");
+  const screenedNews = screenImportanceWithAI(newNews, API_KEY);
+  const targetNewsList = screenedNews.filter(n => n.importance === '상' || n.importance === '중').slice(0, 30);
   
-  // 크롤링 수량을 100개로 확대
-  const finalNews = crawlNewsContent(cleanedNews.slice(0, 100));
+  // Stage 2: 전문 크롤링 (선별된 기사만)
+  console.log(`Stage 2 시작: ${targetNewsList.length}건 전문 수집...`);
+  const crawledNews = crawlNewsContent(targetNewsList);
+
+  // Stage 3: 정밀 분석 (전문 기반 요약 및 최종 중요도 확정)
+  console.log("Stage 3 시작: 전문 정밀 분석 및 요약...");
+  const finalNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
 
   if (finalNews.length > 0) {
     const rows = finalNews.map(n => [
@@ -203,92 +235,107 @@ function fetchNewsFromNaver() {
   return { ok: true, count: finalNews.length };
 }
 
-function crawlNewsContent(newsList) {
-  const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
+// --- 1단계: AI 뉴스 스크리닝 (제목/요약 기반) ---
+function screenImportanceWithAI(newsList, apiKey) {
+  if (!apiKey || newsList.length === 0) return newsList;
+
+  const newsDataForAI = newsList.map((n, i) => `[${i}] 제목: ${n.title}\n요약: ${n.naverDesc}`).join('\n---\n');
+  const prompt = `당신은 업무 효율을 극대화하는 뉴스 에디터입니다.
+아래 뉴스 리스트를 분석하여 2가지 작업을 수행하세요.
+
+[수행 작업]
+1. 중요도 판별: '서울신용보증재단', '소상공인 지원 정책', '상권 분석', '지방자치단체 업무보고'와의 연관성에 따라 '상', '중', '하'를 매기세요.
+2. 중복 제거: 동일한 사건을 다루는 뉴스가 여러 개라면, 가장 제목이 명확하고 내용이 풍부해 보이는 1개만 '상' 또는 '중'으로 남기고 나머지는 무조건 '하'로 강등시키세요.
+
+[응답 형식]
+반드시 아래 JSON 형식으로만 답변하세요.
+{
+  "results": [
+    {"index": 0, "importance": "상"},
+    {"index": 1, "importance": "중"},
+    ...
+  ]
+}
+
+[뉴스 리스트]
+${newsDataForAI}`;
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
+    const resp = UrlFetchApp.fetch(url, {
+      method: 'POST',
+      contentType: 'application/json',
+      payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { response_mime_type: "application/json" } }),
+      muteHttpExceptions: true
+    });
+    
+    if (resp.getResponseCode() === 200) {
+      const resJson = JSON.parse(resp.getContentText());
+      const feedback = resJson.candidates[0].content.parts[0].text;
+      const parsed = JSON.parse(feedback);
+      parsed.results.forEach(item => {
+        if (newsList[item.index]) newsList[item.index].importance = item.importance;
+      });
+    }
+  } catch (e) { console.error("Screening AI Error:", e.message); }
+  return newsList;
+}
+
+// --- 3단계: AI 전문 정밀 분석 (본문 기반) ---
+function deepAnalyzeNewsWithAI(newsList, apiKey) {
+  if (!apiKey || newsList.length === 0) return newsList;
+
   return newsList.map(item => {
+    if (!item.fullText || item.fullText.length < 200) {
+      item.aiSummary = item.naverDesc;
+      return item;
+    }
+
+    const prompt = `뉴스 제목: ${item.title}
+본문 전문:
+${item.fullText.substring(0, 5000)}
+
+[지시사항]
+1. 위 기사 본문을 분석하여 핵심 내용을 2~3문장의 명확한 문체로 요약하세요.
+2. 기사의 최종 중요도를 '상', '중', '하' 중에서 다시 판단하세요. (재단 업무와의 밀접도 기준)
+3. 응답은 반드시 JSON 형식으로 하세요: {"summary": "요약내용", "importance": "상/중/하"}
+
+응답 형식 엄수.`;
+
     try {
-      // 1. 링크가 네이버 뉴스인 경우, 더 가벼운 m.news.naver.com 등으로 전환 시도 가능하나 
-      // 현재는 Gemini가 HTML 전체를 보고 판단하므로 타임아웃만 넉넉히 줌
-      const response = UrlFetchApp.fetch(item.link, { 
-        muteHttpExceptions: true, 
-        followRedirects: true, 
-        timeout: 10000, // 타임아웃 10초로 확대
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
+      const resp = UrlFetchApp.fetch(url, {
+        method: 'POST',
+        contentType: 'application/json',
+        payload: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { response_mime_type: "application/json" } }),
+        muteHttpExceptions: true
       });
       
-      if (response.getResponseCode() === 200) {
-        const html = response.getContentText();
-        const res = extractTextWithAI(html, API_KEY, item.title, item.link);
-        if (res && res.length > 100) { 
-          item.fullText = res;
-          item.aiSummary = res.substring(0, 300) + "..."; // 1차 요약 (프론트 표시용)
-        } else {
-          item.fullText = item.naverDesc; // 추출 실패 시 네이버 요약이라도 보존
-          item.aiSummary = item.naverDesc;
-        }
-      } else {
-        console.warn(`크롤링 실패(코드 ${response.getResponseCode()}): ${item.link}`);
-        item.fullText = item.naverDesc;
-        item.aiSummary = item.naverDesc;
+      if (resp.getResponseCode() === 200) {
+        const resJson = JSON.parse(resp.getContentText());
+        const feedback = resJson.candidates[0].content.parts[0].text;
+        const parsed = JSON.parse(feedback);
+        item.aiSummary = parsed.summary;
+        item.importance = parsed.importance;
       }
-    } catch (e) {
-      console.warn("크롤링 예외 발생:", item.link, e.message);
-      item.fullText = item.naverDesc;
-      item.aiSummary = item.naverDesc;
-    }
+    } catch (e) { console.error("Deep Analysis AI Error:", e.message); }
     return item;
   });
 }
 
 function extractTextWithAI(html, apiKey, title, url) {
   if (!apiKey) return null;
-  
-  // HTML이 너무 크면 Gemini 입력 제한에 걸릴 수 있으므로 핵심 영역 위주로 절삭
-  // 보통 기사 본문은 앞부분에 위치함
   const slicedHtml = html.length > 25000 ? html.substring(0, 25000) : html;
-
-  const prompt = `뉴스 제목: ${title}
-뉴스 URL: ${url}
-
-[지시사항]
-1. 제공된 HTML 소스에서 뉴스 기사의 "본문 전문"만 깨끗하게 추출하세요.
-2. 기사 내용과 무관한 요소(광고, 바닥글, 기자 이메일, 추천 기사 목록, 댓글, SNS 공유 버튼 등)는 반드시 제외하세요.
-3. 기사 본문의 문맥을 유지하며, 텍스트 형태 그대로 반환하세요.
-4. 만약 본문 추출이 불가능한 구조라면, HTML 내에 포함된 핵심 내용 요약이라도 찾아내어 반환하세요.
-5. 응답에는 오직 추출된 본문 텍스트만 포함하세요. (설명 생략)
-
-[HTML 데이터]
-${slicedHtml}`;
+  const prompt = `뉴스 제목: ${title}\nURL: ${url}\n\n[지시사항]\n제공된 HTML에서 기사 "본문"만 깨끗하게 추출하세요. 광고/메뉴/댓글 지우고 텍스트만. 추출 불가능하면 핵심 요약이라도 찾으세요.\n\n[HTML]\n${slicedHtml}`;
 
   try {
-    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const payload = { 
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 2048
-      }
-    };
-    const resp = UrlFetchApp.fetch(apiURL, { 
-      method: "POST", 
-      contentType: "application/json", 
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-    
-    if (resp.getResponseCode() !== 200) {
-      console.error("Gemini API Error:", resp.getContentText());
-      return null;
-    }
-    
+    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
+    const payload = { contents: [{ parts: [{ text: prompt }] }] };
+    const resp = UrlFetchApp.fetch(apiURL, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) return null;
     const content = JSON.parse(resp.getContentText());
     return content.candidates[0].content.parts[0].text.trim();
-  } catch (e) { 
-    console.error("extractTextWithAI Exception:", e.message);
-    return null; 
-  }
+  } catch (e) { return null; }
 }
 
 // --- Gemini AI를 이용한 뉴스 정제 ---

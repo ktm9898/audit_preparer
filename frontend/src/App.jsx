@@ -490,12 +490,13 @@ function App() {
                 </div>
               </div>
 
-              <div className="news-table-container">
+              <div className="news-table-container premium-shadow">
                 <div className="section-title-sm">수집된 관련 뉴스 ({newsCount}건)</div>
                 <div className="table-responsive">
                   <table className="premium-table">
                     <thead>
                       <tr>
+                        <th style={{ width: '80px' }}>중요도</th>
                         <th style={{ width: '100px' }}>날짜</th>
                         <th style={{ width: '120px' }}>언론사</th>
                         <th>뉴스 제목 및 요약</th>
@@ -505,11 +506,16 @@ function App() {
                     <tbody>
                       {news.length === 0 ? (
                         <tr>
-                          <td colSpan="4" className="empty-row">수집된 뉴스가 없습니다. '최신 뉴스 수집' 버튼을 눌러주세요.</td>
+                          <td colSpan="5" className="empty-row">수집된 뉴스가 없습니다. '최신 뉴스 수집' 버튼을 눌러주세요.</td>
                         </tr>
                       ) : (
                         news.map((item, idx) => (
-                          <tr key={idx}>
+                          <tr key={idx} className="news-row">
+                            <td className="importance-cell">
+                              <span className={`importance-badge ${item.중요도 === '상' ? 'high' : item.중요도 === '중' ? 'mid' : 'low'}`}>
+                                {item.중요도 || '하'}
+                              </span>
+                            </td>
                             <td className="date-cell">{item.날짜 || "오늘"}</td>
                             <td className="source-cell">
                               <span className="source-badge">{item.언론사 || "뉴스"}</span>
@@ -517,7 +523,7 @@ function App() {
                             <td className="content-cell">
                               <div className="news-title-link">{item.제목 || item.title}</div>
                               <div className="news-summary-text">
-                                {item.aiSummary || item.naverDesc || "본문 내용을 확인해 주세요."}
+                                {item.AI요약 || item.aiSummary || item.naverDesc || "본문 내용을 확인해 주세요."}
                               </div>
                             </td>
                             <td className="action-cell">
@@ -1132,25 +1138,34 @@ function App() {
         }
 
         /* Premium Table Styles */
-        .news-table-container { background: white; border-radius: 1rem; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); }
+        .premium-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02); }
+        .news-table-container { background: white; border-radius: 1.25rem; border: 1px solid var(--border); overflow: hidden; margin-top: 1.5rem; }
         .table-responsive { overflow-x: auto; }
         .premium-table { width: 100%; border-collapse: collapse; text-align: left; }
         .premium-table th { 
-          background: #f8fafc; padding: 1rem; font-size: 0.85rem; font-weight: 800; color: var(--text-muted);
-          border-bottom: 2px solid var(--border);
+          background: #f8fafc; padding: 1.25rem 1rem; font-size: 0.8rem; font-weight: 800; color: var(--text-muted);
+          border-bottom: 2px solid var(--border); text-transform: uppercase; letter-spacing: 0.025em;
         }
-        .premium-table td { padding: 1.25rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .premium-table td { padding: 1.5rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         .premium-table tr:last-child td { border-bottom: none; }
-        .premium-table tr:hover { background: #fcfdfe; }
+        .premium-table tr.news-row:hover { background: #f8fafc; cursor: pointer; }
 
-        .date-cell { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; font-family: monospace; }
+        .importance-badge { 
+          display: inline-flex; align-items: center; justify-content: center;
+          padding: 4px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 800;
+        }
+        .importance-badge.high { background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; }
+        .importance-badge.mid { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+        .importance-badge.low { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+
+        .date-cell { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; font-family: 'Inter', sans-serif; }
         .source-badge { 
           display: inline-block; padding: 4px 10px; border-radius: 6px; 
-          background: #f1f5f9; color: var(--text-muted); font-size: 0.75rem; font-weight: 700;
+          background: #f1f5f9; color: var(--text-muted); font-size: 0.75rem; font-weight: 800;
         }
-        .news-title-link { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; line-height: 1.4; }
+        .news-title-link { font-size: 1.05rem; font-weight: 800; color: var(--text); margin-bottom: 0.6rem; line-height: 1.5; color: #1e293b; }
         .news-summary-text { 
-           font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;
+           font-size: 0.9rem; color: #475569; line-height: 1.7;
            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
         .icon-link-btn {
