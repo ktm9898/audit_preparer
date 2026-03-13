@@ -425,26 +425,19 @@ function App() {
                       <div key={i} className="content-card persona">
                         <div className="card-top">
                           <span className="name">{p.의원명 || p.이름} 의원</span>
-                          <span className="party-badge">{p.지역구 || p.소속 || "지역구 미지정"}</span>
+                          <span className="party-badge">{p.지역구 || p.소속 || "지역구 미확인"}</span>
                         </div>
                         <div className="card-body">
-                            <div className="info-group">
-                              <label>질문 성향</label>
-                              <p className="line-clamp-1">{p["질문 성향"] || p["성향"] || p["스타일"] || p["질문 스타일"] || "-"}</p>
+                          <div className="summary-section">
+                            <label>발언 상세 및 요약 분석</label>
+                            <div className="summary-text-large">
+                              {p.발언요약 || p.상세발언 || p["발언 요약"] || p["발언요약"] || "분석된 발언 내용이 없습니다. 분석 파이프라인을 실행해 주세요."}
                             </div>
-                          </div>
-                          <div className="info-group">
-                            <label>상세 발언 요약</label>
-                            <p className="summary-text line-clamp-3">{p["발언 요약"] || p["발언요약"] || "-"}</p>
-                          </div>
-                          <div className="info-group danger">
-                            <label>핵심 감사 포인트</label>
-                            <p className="line-clamp-2">{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || p["예상 공격 전략"] || "-"}</p>
                           </div>
                         </div>
                         <div className="card-footer-action">
                           <button className="premium-more-btn" onClick={() => setSelectedPersona(p)}>
-                            상세 분석 리포트 <ArrowUpRight size={14} />
+                            리포트 상세보기 <ArrowUpRight size={14} />
                           </button>
                         </div>
                       </div>
