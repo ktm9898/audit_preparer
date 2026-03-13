@@ -146,15 +146,17 @@ function fetchNewsFromNaver() {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
+  const headers = ["날짜", "주제", "언론사", "제목", "네이버요약", "본문전문", "링크", "AI요약", "중요도"];
+  
   if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['날짜', '언론사', '제목', '요약', '링크', '수집일']);
+    sheet.appendRow(headers);
   }
-  // 헤더가 바뀐 경우 대응 (첫 행이 '날짜'가 아니면 초기화)
-  if (sheet.getRange(1, 1).getValue() !== '날짜') {
-    sheet.clear().appendRow(['날짜', '언론사', '제목', '요약', '링크', '수집일']);
+  // 헤더가 다른 경우 초기화
+  if (sheet.getRange(1, 1).getValue() !== '날짜' || sheet.getLastColumn() < headers.length) {
+    sheet.clear().appendRow(headers);
   }
-  const existingLinks = sheet.getRange("E:E").getValues().flat().map(String);
-  const existingTitles = sheet.getRange("C:C").getValues().flat().map(String);
+  const existingLinks = sheet.getLastRow() > 1 ? sheet.getRange("G:G").getValues().flat().map(String) : []; // 링크 컬럼이 G로 이동
+  const existingTitles = sheet.getLastRow() > 1 ? sheet.getRange("D:D").getValues().flat().map(String) : []; // 제목 컬럼이 D로 이동
   
   const newNews = allItems.filter(item => {
                           const link = item.originallink || item.link;
@@ -163,10 +165,14 @@ function fetchNewsFromNaver() {
                         })
                         .map(item => ({
                           date: Utilities.formatDate(new Date(item.pubDate), "GMT+9", "yyyy-MM-dd"),
+                          topic: "서울신용보증재단",
                           source: "뉴스",
                           title: item.title.replace(/<[^>]+>/g, ""),
-                          desc: item.description.replace(/<[^>]+>/g, ""),
-                          link: item.originallink || item.link
+                          naverDesc: item.description.replace(/<[^>]+>/g, ""),
+                          fullText: "", // 크롤링 전
+                          link: item.originallink || item.link,
+                          aiSummary: "", // 크롤링/요약 전
+                          importance: "-"
                         }))
                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // 최신순 정렬
 
@@ -179,9 +185,19 @@ function fetchNewsFromNaver() {
   const finalNews = crawlNewsContent(cleanedNews.slice(0, 100));
 
   if (finalNews.length > 0) {
-    const rows = finalNews.map(n => [n.date, n.source, n.title, n.desc, n.link, Utilities.formatDate(new Date(), "GMT+9", "yyyy-MM-dd HH:mm")]);
+    const rows = finalNews.map(n => [
+      n.date, 
+      n.topic, 
+      n.source, 
+      n.title, 
+      n.naverDesc, 
+      n.fullText, 
+      n.link, 
+      n.aiSummary || n.naverDesc, // AI 요약이 없으면 네이버 요약으로
+      n.importance
+    ]);
     sheet.insertRowsAfter(1, rows.length); // 헤더 아래에 새 행 삽입
-    sheet.getRange(2, 1, rows.length, 6).setValues(rows);
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
   }
 
   return { ok: true, count: finalNews.length };
@@ -197,7 +213,8 @@ function crawlNewsContent(newsList) {
         // Gemini에게 본문 추출 요청
         const res = extractTextWithAI(html, API_KEY, item.title);
         if (res && res.length > 100) { // 100자 이상일 경우에만 업데이트
-          item.desc = res;
+          item.aiSummary = res;
+          item.fullText = html.substring(0, 50000); // 본문 일부 저장 (너무 크면 안됨)
         }
       } else {
         console.warn(`크롤링 실패: ${item.link}, 응답 코드: ${response.getResponseCode()}`);

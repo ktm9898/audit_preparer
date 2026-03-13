@@ -522,7 +522,7 @@ function App() {
                       <a key={i} href={item.link || item["링크"]} target="_blank" rel="noreferrer" className="mini-news-card">
                         <span className="date">{item.date || item["날짜"]}</span>
                         <div className="title">{item.title || item["제목"]}</div>
-                        <p>{item.desc || item["요약"] || "내용 요약 중..."}</p>
+                        <p>{item["AI요약"] || item["AI 요약"] || item.aiSummary || item["네이버요약"] || item["네이버 요약"] || item.desc || item["요약"] || item["본문내용"] || item["내용"] || "내용 요약 중..."}</p>
                       </a>
                     ))}
                     {news.length === 0 && (
