@@ -490,48 +490,46 @@ function App() {
                 </div>
               </div>
 
-              <div className="risks-layout">
-                {/* 메인: 뉴스 목록 (Premium Card Style) */}
-                <div className="risks-main">
-                  <div className="section-title-sm">수집된 관련 뉴스 ({newsCount}건)</div>
-                  <div className="news-feed-grid">
-                    {news.length === 0 ? (
-                      <div className="empty-state-sm">수집된 뉴스가 없습니다. '최신 뉴스 수집' 버튼을 눌러주세요.</div>
-                    ) : (
-                      news.map((item, idx) => (
-                        <a key={idx} href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="premium-news-card">
-                          <div className="news-badge">{item.언론사 || "뉴스"}</div>
-                          <div className="news-content">
-                            <h3 className="news-title">{item.제목 || item.title}</h3>
-                            <p className="news-desc">{item.AI요약 || item.naverDesc || item.요약 || "본문 내용을 확인해 주세요."}</p>
-                            <div className="news-meta">
-                              <span className="news-date">{item.날짜 || "오늘"}</span>
-                              <ExternalLink size={12} />
-                            </div>
-                          </div>
-                        </a>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* 사이드바: 분석된 리스크 요인 */}
-                <div className="risks-sub">
-                  <div className="section-header-sm">
-                    <div className="title-row"><ShieldAlert size={16} /><span>추출된 리스크</span></div>
-                  </div>
-                  <div className="mini-risk-list">
-                    {risks.length === 0 ? (
-                      <div className="empty-state-sm">추출된 리스크가 없습니다.<br/>'예상 질문' 탭에서 [리스크 추출]을 진행하세요.</div>
-                    ) : (
-                      risks.map((r, i) => (
-                        <div key={i} className="mini-risk-card">
-                          <div className="risk-title">{r["리스크 요인"]}</div>
-                          <div className="risk-body">{r["세부 내용"]}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+              <div className="news-table-container">
+                <div className="section-title-sm">수집된 관련 뉴스 ({newsCount}건)</div>
+                <div className="table-responsive">
+                  <table className="premium-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '100px' }}>날짜</th>
+                        <th style={{ width: '120px' }}>언론사</th>
+                        <th>뉴스 제목 및 요약</th>
+                        <th style={{ width: '80px' }}>링크</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {news.length === 0 ? (
+                        <tr>
+                          <td colSpan="4" className="empty-row">수집된 뉴스가 없습니다. '최신 뉴스 수집' 버튼을 눌러주세요.</td>
+                        </tr>
+                      ) : (
+                        news.map((item, idx) => (
+                          <tr key={idx}>
+                            <td className="date-cell">{item.날짜 || "오늘"}</td>
+                            <td className="source-cell">
+                              <span className="source-badge">{item.언론사 || "뉴스"}</span>
+                            </td>
+                            <td className="content-cell">
+                              <div className="news-title-link">{item.제목 || item.title}</div>
+                              <div className="news-summary-text">
+                                {item.aiSummary || item.naverDesc || "본문 내용을 확인해 주세요."}
+                              </div>
+                            </td>
+                            <td className="action-cell">
+                              <a href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="icon-link-btn">
+                                <ExternalLink size={16} />
+                              </a>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
@@ -546,57 +544,70 @@ function App() {
                 </div>
                 <div className="btn-group">
                   <button className="action-btn secondary" onClick={() => handleAction('risks')}>
-                    <ShieldAlert size={16} /> 리스크 추출
+                    <ShieldAlert size={16} /> 1단계: 리스크 추출
                   </button>
                   <button className="action-btn primary" onClick={() => handleAction('questions')}>
-                    <MessageSquare size={16} /> 예상 질문 및 답변 생성
+                    <MessageSquare size={16} /> 2단계: 예상 질문 및 답변 생성
                   </button>
                 </div>
               </div>
 
+              <div className="analysis-pipeline-info">
+                <div className="info-txt">
+                  <AlertTriangle size={16} className="text-warning" />
+                  <span>"최근 뉴스" 데이터를 기반으로 <b>리스크</b>를 먼저 추출한 뒤, 최종 <b>예상 질문</b>을 생성하십시오.</span>
+                </div>
+              </div>
+
               <div className="questions-flow">
-                {risks.length > 0 && (
-                  <div className="analysis-step">
-                    <div className="step-header">
-                      <div className="step-num">Step 1</div>
-                      <h3>분석된 리스크 요인</h3>
+                <div className="analysis-step">
+                  <div className="step-header">
+                    <div className="step-num">Step 1</div>
+                    <h3>분석된 리스크 요인 ({risks.length}건)</h3>
+                  </div>
+                  {risks.length === 0 ? (
+                    <div className="empty-state-card">
+                      <ShieldAlert size={32} className="icon-muted" />
+                      <p>상단의 [리스크 추출] 버튼을 눌러 분석을 시작하세요.</p>
                     </div>
+                  ) : (
                     <div className="risk-horizontal-scroll">
                       {risks.map((r, i) => (
                         <div key={i} className="flow-risk-card">
-                          <h4>{r["리스크 요인"]}</h4>
-                          <p>{r["세부 내용"]}</p>
-                          <div className="evidence">근거: {r["관련 근거"]}</div>
+                          <h4>{r["리스크 요인"] || r["요인"]}</h4>
+                          <p>{r["세부 내용"] || r["내용"]}</p>
+                          <div className="evidence">근거: {r["관련 근거"] || r["근거"] || "수집 뉴스 데이터"}</div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <div className="analysis-step">
                   <div className="step-header">
                     <div className="step-num">Step 2</div>
-                    <h3>최종 예상 질문 및 대응 방향</h3>
+                    <h3>최종 예상 질문 및 대응 가이드 ({questions.length}개)</h3>
                   </div>
                   
                   <div className="questions-grid">
                     {questions.length === 0 ? (
-                      <div className="empty-state">
-                        <HelpCircle size={48} className="empty-icon" />
-                        <p>추출된 예상 질문이 없습니다.<br/>[리스크 추출] 후 [질문 및 답변 생성]을 진행하세요.</p>
+                      <div className="empty-state-card">
+                        <MessageSquare size={32} className="icon-muted" />
+                        <p>리스크가 추출된 상태에서 [예상 질문 및 답변 생성]을 진행하세요.</p>
                       </div>
                     ) : (
                       questions.map((q, i) => (
                         <div key={i} className="premium-question-card">
-                          <div className="q-badge">질문 {i+1}</div>
+                          <div className="q-badge">예상 질문 {i+1}</div>
                           <div className="q-content">
                             <h4 className="question-text">{q["예상 질문"] || q["질문"]}</h4>
                             <div className="answer-section">
-                              <div className="label">대응 및 답변 방향</div>
-                              <p className="answer-text">{q["답변 방향"] || q["대응방안"] || q["답변"]}</p>
+                              <div className="label">대응 가이드 및 답변 방향</div>
+                              <p className="answer-text">{q["답변 가이드"] || q["답변 방향"] || q["대응방안"] || q["답변"]}</p>
                             </div>
                             <div className="q-meta">
-                              <span>관련 쟁점: {q["관련 리스크"] || "-"}</span>
+                              <span>작성자: AI 분석 엔진</span>
+                              {q["분류"] && <span className="ml-2">| 분류: {q["분류"]}</span>}
                             </div>
                           </div>
                         </div>
@@ -615,20 +626,18 @@ function App() {
         <div className="modal-overlay fade-in" onClick={() => setSelectedPersona(null)}>
           <div className="detail-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{selectedPersona.의원명 || selectedPersona.이름} 의원 발언 분석</h3>
+              <h3>{selectedPersona.의원명 || selectedPersona.이름} 의원 상세 발언 요약</h3>
               <button className="close-btn" onClick={() => setSelectedPersona(null)}><X size={20} /></button>
             </div>
-            <div className="modal-body-scroll">
-                <div className="analysis-section">
-                  <div className="section-header">
-                    <MessageSquare size={16} className="section-icon" />
-                    <span>상세 발언 기록 및 요약</span>
+            <div className="modal-body-scroll premium-scroll">
+                <div className="persona-detail-container">
+                  <div className="detail-meta">
+                    <div className="meta-badge">{selectedPersona.지역구 || "지역구 미확인"}</div>
+                    <h4>관련 회의록 발언 상세 기록</h4>
                   </div>
-                  <div className="analysis-content-premium">
+                  <div className="speech-summary-box">
                     {selectedPersona.발언요약 || selectedPersona["발언 요약"] || selectedPersona["발언요약"] || 
-                     selectedPersona.상세발언 || selectedPersona["상세 발언"] || 
-                     selectedPersona["발언 상세 및 요약"] || selectedPersona["상세 발언 기록 및 요약"] ||
-                     "분석된 데이터가 없습니다."}
+                     selectedPersona.상세발언 || "발언 기록이 없습니다. 분석 파이프라인을 실행해 주세요."}
                   </div>
                 </div>
             </div>
@@ -1120,6 +1129,58 @@ function App() {
         @media (max-width: 1024px) {
           .risks-layout { grid-template-columns: 1fr; }
           .risks-sub { max-height: 400px; }
+        }
+
+        /* Premium Table Styles */
+        .news-table-container { background: white; border-radius: 1rem; border: 1px solid var(--border); overflow: hidden; box-shadow: var(--shadow); }
+        .table-responsive { overflow-x: auto; }
+        .premium-table { width: 100%; border-collapse: collapse; text-align: left; }
+        .premium-table th { 
+          background: #f8fafc; padding: 1rem; font-size: 0.85rem; font-weight: 800; color: var(--text-muted);
+          border-bottom: 2px solid var(--border);
+        }
+        .premium-table td { padding: 1.25rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+        .premium-table tr:last-child td { border-bottom: none; }
+        .premium-table tr:hover { background: #fcfdfe; }
+
+        .date-cell { font-size: 0.85rem; color: var(--text-muted); font-weight: 500; font-family: monospace; }
+        .source-badge { 
+          display: inline-block; padding: 4px 10px; border-radius: 6px; 
+          background: #f1f5f9; color: var(--text-muted); font-size: 0.75rem; font-weight: 700;
+        }
+        .news-title-link { font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 0.5rem; line-height: 1.4; }
+        .news-summary-text { 
+           font-size: 0.85rem; color: var(--text-muted); line-height: 1.6;
+           display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .icon-link-btn {
+          display: flex; align-items: center; justify-content: center;
+          width: 2.5rem; height: 2.5rem; border-radius: 0.5rem;
+          color: var(--primary); transition: all 0.2s;
+        }
+        .icon-link-btn:hover { background: var(--primary-light); }
+        .empty-row { padding: 4rem 0; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+
+        /* Pipeline Styles */
+        .analysis-pipeline-info { background: #fffbeb; border: 1px solid #fef3c7; padding: 0.75rem 1.25rem; border-radius: 0.75rem; margin-bottom: 2rem; }
+        .analysis-pipeline-info .info-txt { display: flex; align-items: center; gap: 0.6rem; font-size: 0.85rem; color: #92400e; }
+        .empty-state-card { 
+          background: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 1rem; padding: 3rem; 
+          text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; color: var(--text-muted);
+        }
+        .icon-muted { opacity: 0.4; }
+        .ml-2 { margin-left: 0.5rem; }
+
+        /* Modal Styles */
+        .premium-scroll::-webkit-scrollbar { width: 6px; }
+        .premium-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .persona-detail-container { padding: 1.5rem; }
+        .detail-meta { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #f1f5f9; }
+        .meta-badge { background: var(--primary-light); color: var(--primary); font-size: 0.75rem; font-weight: 800; padding: 4px 12px; border-radius: 20px; }
+        .detail-meta h4 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--text); }
+        .speech-summary-box { 
+          font-size: 0.95rem; line-height: 1.8; color: #334155; white-space: pre-wrap;
+          background: #fcfdfe; padding: 1.5rem; border-radius: 1rem; border: 1px solid #f1f5f9;
         }
       `}</style>
     </div>

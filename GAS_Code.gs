@@ -207,34 +207,88 @@ function crawlNewsContent(newsList) {
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
   return newsList.map(item => {
     try {
-      const response = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, followRedirects: true, timeout: 5000 });
+      // 1. 링크가 네이버 뉴스인 경우, 더 가벼운 m.news.naver.com 등으로 전환 시도 가능하나 
+      // 현재는 Gemini가 HTML 전체를 보고 판단하므로 타임아웃만 넉넉히 줌
+      const response = UrlFetchApp.fetch(item.link, { 
+        muteHttpExceptions: true, 
+        followRedirects: true, 
+        timeout: 10000, // 타임아웃 10초로 확대
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+      });
+      
       if (response.getResponseCode() === 200) {
         const html = response.getContentText();
-        const res = extractTextWithAI(html, API_KEY, item.title);
-        if (res && res.length > 200) { 
+        const res = extractTextWithAI(html, API_KEY, item.title, item.link);
+        if (res && res.length > 100) { 
           item.fullText = res;
-          item.aiSummary = res.substring(0, 300) + "...";
+          item.aiSummary = res.substring(0, 300) + "..."; // 1차 요약 (프론트 표시용)
+        } else {
+          item.fullText = item.naverDesc; // 추출 실패 시 네이버 요약이라도 보존
+          item.aiSummary = item.naverDesc;
         }
       } else {
-        console.warn(`크롤링 실패: ${item.link}, 응답 코드: ${response.getResponseCode()}`);
+        console.warn(`크롤링 실패(코드 ${response.getResponseCode()}): ${item.link}`);
+        item.fullText = item.naverDesc;
+        item.aiSummary = item.naverDesc;
       }
     } catch (e) {
-      console.warn("크롤링 실패:", item.link, e.message);
+      console.warn("크롤링 예외 발생:", item.link, e.message);
+      item.fullText = item.naverDesc;
+      item.aiSummary = item.naverDesc;
     }
     return item;
   });
 }
 
-function extractTextWithAI(html, apiKey, title) {
+function extractTextWithAI(html, apiKey, title, url) {
   if (!apiKey) return null;
-  const prompt = `뉴스 제목: ${title}\n\n[지시사항]\n1. 아래 뉴스 페이지 HTML에서 기사의 "본문 전문"만 정확하게 추출하세요.\n2. 광고, 기자 정보, 추천 기사, 브라우저 메뉴, 댓글, SNS 공유 버튼 등 본문 이외의 모든 노이즈는 완벽하게 제거하세요.\n3. 요약하지 말고, 기사 원문의 흐름과 내용을 최대한 상세히 보존하세요.\n4. 응답은 오직 정제된 본문 텍스트만 반환하세요.\n\n[HTML 데이터]\n${html.substring(0, 20000)}`;
+  
+  // HTML이 너무 크면 Gemini 입력 제한에 걸릴 수 있으므로 핵심 영역 위주로 절삭
+  // 보통 기사 본문은 앞부분에 위치함
+  const slicedHtml = html.length > 25000 ? html.substring(0, 25000) : html;
+
+  const prompt = `뉴스 제목: ${title}
+뉴스 URL: ${url}
+
+[지시사항]
+1. 제공된 HTML 소스에서 뉴스 기사의 "본문 전문"만 깨끗하게 추출하세요.
+2. 기사 내용과 무관한 요소(광고, 바닥글, 기자 이메일, 추천 기사 목록, 댓글, SNS 공유 버튼 등)는 반드시 제외하세요.
+3. 기사 본문의 문맥을 유지하며, 텍스트 형태 그대로 반환하세요.
+4. 만약 본문 추출이 불가능한 구조라면, HTML 내에 포함된 핵심 내용 요약이라도 찾아내어 반환하세요.
+5. 응답에는 오직 추출된 본문 텍스트만 포함하세요. (설명 생략)
+
+[HTML 데이터]
+${slicedHtml}`;
+
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const resp = UrlFetchApp.fetch(url, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload) });
+    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const payload = { 
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 2048
+      }
+    };
+    const resp = UrlFetchApp.fetch(apiURL, { 
+      method: "POST", 
+      contentType: "application/json", 
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+    
+    if (resp.getResponseCode() !== 200) {
+      console.error("Gemini API Error:", resp.getContentText());
+      return null;
+    }
+    
     const content = JSON.parse(resp.getContentText());
-    return content.candidates[0].content.parts[0].text;
-  } catch (e) { return null; }
+    return content.candidates[0].content.parts[0].text.trim();
+  } catch (e) { 
+    console.error("extractTextWithAI Exception:", e.message);
+    return null; 
+  }
 }
 
 // --- Gemini AI를 이용한 뉴스 정제 ---
