@@ -84,6 +84,7 @@ function App() {
       setQuestions(res.data.questions || []);
       setNews(res.data.news || []);
       setNewsCount(res.data.news_count || 0);
+      console.log('App Data Loaded:', res.data);
 
       const mRes = await axios.get(`${API_BASE}?action=listFiles&type=minutes&token=${passcode}`);
       if (Array.isArray(mRes.data)) setMinutesFiles(mRes.data);

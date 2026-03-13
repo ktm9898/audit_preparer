@@ -5,7 +5,7 @@ const PROPS = PropertiesService.getScriptProperties();
 const ACCESS_TOKEN = PROPS.getProperty('ACCESS_TOKEN') || "audit123"; // 기본값, 사용자가 속성에서 변경 가능
 
 function checkAuth(e) {
-  const token = e.parameter.token || (e.postData && JSON.parse(e.postData.contents).token);
+  const token = (e && e.parameter && e.parameter.token) || (e && e.postData && JSON.parse(e.postData.contents).token);
   if (token !== ACCESS_TOKEN) {
     throw new Error("접근 권한이 없습니다. (올바른 인증 토큰이 필요합니다)");
   }
@@ -34,12 +34,14 @@ function doGet(e) {
     }
 
     if (action === 'getAllData') {
+      const sheets = ss.getSheets().map(s => s.getName());
       return createResponse({
         personas: getTabData(ss, '의원별 관심사'),
         risks: getTabData(ss, '리스크 요인'),
         questions: getTabData(ss, '예상 질문'),
         news: getTabData(ss, '최근 뉴스'),
-        news_count: getTabRowCount(ss, '최근 뉴스') - 1
+        news_count: Math.max(0, getTabRowCount(ss, '최근 뉴스') - 1),
+        debug: { availableSheets: sheets }
       });
     }
 
@@ -134,6 +136,10 @@ function fetchNewsFromNaver() {
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(['날짜', '언론사', '제목', '요약', '링크', '수집일']);
+  }
+  // 헤더가 바뀐 경우 대응 (첫 행이 '날짜'가 아니면 초기화)
+  if (sheet.getRange(1, 1).getValue() !== '날짜') {
+    sheet.clear().appendRow(['날짜', '언론사', '제목', '요약', '링크', '수집일']);
   }
   const existingLinks = sheet.getRange("E:E").getValues().flat().map(String);
   
