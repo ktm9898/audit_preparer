@@ -544,9 +544,12 @@ function App() {
                   <MessageSquare size={16} className="section-icon" />
                   <span>발언 상세 및 요약</span>
                 </div>
-                <div className="analysis-content-premium">
-                  {selectedPersona.발언요약 || selectedPersona.상세발언 || "분석된 발언 내용이 없습니다. 회의록 파일을 업로드하고 분석 파이프라인을 실행해 주세요."}
-                </div>
+                  <div className="analysis-content-premium">
+                    {selectedPersona.발언요약 || selectedPersona["발언 요약"] || selectedPersona["발언요약"] || 
+                     selectedPersona.상세발언 || selectedPersona["상세 발언"] || 
+                     selectedPersona["발언 상세 및 요약"] || selectedPersona["상세 발언 기록 및 요약"] ||
+                     "분석된 발언 내용이 없거나 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요."}
+                  </div>
               </div>
             </div>
             <div className="modal-footer">
@@ -886,22 +889,24 @@ function App() {
         
         .analysis-section { margin-bottom: 2rem; }
         .section-header { 
-          display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
-          color: var(--primary); font-size: 0.8rem; font-weight: 800; text-transform: uppercase;
-          letter-spacing: 0.05em;
+          display: flex !important; align-items: center !important; gap: 0.6rem !important; 
+          justify-content: flex-start !important; margin-bottom: 0.8rem;
+          color: var(--primary); font-size: 0.85rem; font-weight: 800;
         }
         .section-icon { color: var(--primary); }
         
         .analysis-content-premium {
           background: #f0f7ff; 
           border: 1px solid #e0efff;
-          padding: 1.25rem;
-          border-radius: 1rem;
-          font-size: 1rem;
-          line-height: 1.7;
+          padding: 1.5rem;
+          border-radius: 1.25rem;
+          font-size: 1.05rem;
+          font-weight: 500;
+          line-height: 1.8;
           color: #1e293b;
           white-space: pre-wrap;
-          box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+          box-shadow: inset 0 2px 8px rgba(0,0,0,0.03);
+          letter-spacing: -0.01em;
         }
 
         .modal-footer { 
