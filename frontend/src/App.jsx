@@ -436,11 +436,11 @@ function App() {
                             <div className="meta-item">
                               <label>질문 성향</label>
                               <p>{p["질문 성향"] || p["성향"] || "-"}</p>
-                              <div className="meta-item danger">
+                            </div>
+                            <div className="meta-item danger">
                               <label>핵심 감사 포인트</label>
                               <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || "-"}</p>
                             </div>
-                          </div>
                           </div>
                           <div className="summary-section">
                             <label>발언 상세 및 요약</label>
