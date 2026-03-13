@@ -113,7 +113,7 @@ function fetchNewsFromNaver() {
   if (!CLIENT_ID || !CLIENT_SECRET) return { ok: false, error: "네이버 API 설정이 필요합니다." };
 
   const query = "서울신용보증재단";
-  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=50&sort=date`;
+  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&sort=date`;
   
   const response = UrlFetchApp.fetch(url, {
     headers: { "X-Naver-Client-Id": CLIENT_ID, "X-Naver-Client-Secret": CLIENT_SECRET }
@@ -121,7 +121,7 @@ function fetchNewsFromNaver() {
   const items = JSON.parse(response.getContentText()).items;
   
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('최근 뉴스');
+  const sheet = getOrCreateSheet(ss, '최근 뉴스');
   const existingLinks = sheet.getRange("E:E").getValues().flat();
   
   const newNews = items.filter(item => !existingLinks.includes(item.originallink || item.link))
@@ -185,7 +185,7 @@ function runAIAnalysis(task, fileId) {
   const contents = { parts: [] };
 
   if (task === 'risks') {
-    const newsSheet = ss.getSheetByName('최근 뉴스');
+    const newsSheet = getOrCreateSheet(ss, '최근 뉴스');
     const context = newsSheet.getDataRange().getValues().slice(1).map(r => `[${r[0]}] ${r[2]}: ${r[3]}`).join("\n");
     var prompt = `[지시사항] 반드시 제공된 뉴스 데이터에 기반하여 리스크를 도출하세요. 없는 사실을 지어내지 마세요.
 [미션] 서울신용보증재단 뉴스 데이터를 바탕으로 행정감사 리스크 쟁점 10개를 도출하세요. 

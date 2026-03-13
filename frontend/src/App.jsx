@@ -418,30 +418,30 @@ function App() {
                 <div className="main-content">
                   <div className="card-grid">
                     {personas.map((p, i) => (
-                          <div key={i} className="content-card persona">
-                            <div className="card-top">
-                              <span className="name">{p.의원명} 의원</span>
-                              <span className="party-badge">{p.지역구 || p.소속}</span>
-                            </div>
-                            <div className="card-body">
-                              <div className="info-group">
-                                <label>주요 관심사</label>
-                                <p>{p["주요 관심사"] || p["관심사"]}</p>
-                              </div>
-                              <div className="info-group">
-                                <label>질문 성향</label>
-                                <p>{p["질문 성향"] || p["질문 스타일"] || p["성향"] || p["스타일"]}</p>
-                              </div>
-                              <div className="info-group">
-                                <label>발언 요약</label>
-                                <p className="summary-text">{p["발언 요약"] || p["발언요약"]}</p>
-                              </div>
-                              <div className="info-group danger">
-                                <label>예상 감사 포인트</label>
-                                <p>{p["예상 감사 포인트"] || p["공격 포인트"]}</p>
-                              </div>
-                            </div>
+                      <div key={i} className="content-card persona">
+                        <div className="card-top">
+                          <span className="name">{p.의원명 || p.이름} 의원</span>
+                          <span className="party-badge">{p.지역구 || p.소속 || "지역구 미지정"}</span>
+                        </div>
+                        <div className="card-body">
+                          <div className="info-group">
+                            <label>주요 관심사</label>
+                            <p>{p["주요 관심사"] || p["관심사"] || p["주요 관심 포인트"] || "-"}</p>
                           </div>
+                          <div className="info-group">
+                            <label>질문 성향</label>
+                            <p>{p["질문 성향"] || p["성향"] || p["스타일"] || p["질문 스타일"] || "-"}</p>
+                          </div>
+                          <div className="info-group">
+                            <label>발언 요약</label>
+                            <p className="summary-text">{p["발언 요약"] || p["발언요약"] || "-"}</p>
+                          </div>
+                          <div className="info-group danger">
+                            <label>예상 감사 포인트</label>
+                            <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || p["예상 공격 전략"] || "-"}</p>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
                   {personas.length === 0 && (
