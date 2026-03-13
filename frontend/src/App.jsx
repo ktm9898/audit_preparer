@@ -428,11 +428,6 @@ function App() {
                           <span className="party-badge">{p.지역구 || p.소속 || "지역구 미지정"}</span>
                         </div>
                         <div className="card-body">
-                          <div className="info-row">
-                            <div className="info-group">
-                              <label>주요 관심사</label>
-                              <p className="line-clamp-1">{p["주요 관심사"] || p["관심사"] || p["주요 관심 포인트"] || "-"}</p>
-                            </div>
                             <div className="info-group">
                               <label>질문 성향</label>
                               <p className="line-clamp-1">{p["질문 성향"] || p["성향"] || p["스타일"] || p["질문 스타일"] || "-"}</p>
@@ -545,46 +540,24 @@ function App() {
       {/* 상세보기 모달 */}
       {selectedPersona && (
         <div className="modal-overlay fade-in" onClick={() => setSelectedPersona(null)}>
-          <div className="modal-content detail-modal" onClick={e => e.stopPropagation()}>
+          <div className="detail-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="persona-title">
-                <span className="name">{selectedPersona.의원명 || selectedPersona.이름} 의원</span>
-                <span className="party-badge">{selectedPersona.지역구 || selectedPersona.소속}</span>
-              </div>
-              <button className="close-btn" onClick={() => setSelectedPersona(null)}>
-                <X size={20} />
-              </button>
+              <h3>{selectedPersona.의원명 || selectedPersona.이름} 의원 발언 분석</h3>
+              <button className="close-btn" onClick={() => setSelectedPersona(null)}><X size={20} /></button>
             </div>
-            <div className="modal-body">
-              <div className="detail-section">
-                <label><Star size={14} /> 주요 관심 영역</label>
-                <div className="tag-cloud">
-                  {(selectedPersona["주요 관심사"] || selectedPersona["관심사"] || "").split(',').map((t, i) => (
-                    <span key={i} className="interest-tag">{t.trim()}</span>
-                  ))}
+            <div className="modal-body-scroll">
+              <div className="analysis-section">
+                <div className="section-header">
+                  <MessageSquare size={16} className="section-icon" />
+                  <span>발언 상세 및 요약</span>
                 </div>
-              </div>
-              
-              <div className="detail-grid">
-                <div className="detail-section">
-                  <label><User size={14} /> 질문 및 상담 성향</label>
-                  <p>{selectedPersona["질문 성향"] || selectedPersona["성향"] || "-"}</p>
-                </div>
-                <div className="detail-section danger">
-                  <label><AlertTriangle size={14} /> 핵심 감사 포인트</label>
-                  <p>{selectedPersona["예상 감사 포인트"] || selectedPersona["감사 포인트"] || "-"}</p>
-                </div>
-              </div>
-
-              <div className="detail-section full">
-                <label><MessageSquare size={14} /> 상세 발언 기록 및 요약</label>
-                <div className="long-text">
-                  {selectedPersona["발언 요약"] || selectedPersona["발언요약"] || "기록된 발언이 없습니다."}
+                <div className="analysis-content-premium">
+                  {selectedPersona.발언요약 || selectedPersona.상세발언 || "분석된 발언 내용이 없습니다. 회의록 파일을 업로드하고 분석 파이프라인을 실행해 주세요."}
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button className="btn-primary" onClick={() => setSelectedPersona(null)}>확인</button>
+              <button className="modal-confirm-btn" onClick={() => setSelectedPersona(null)}>확인</button>
             </div>
           </div>
         </div>
@@ -914,6 +887,40 @@ function App() {
           padding: 5rem 0; text-align: center; color: var(--text-muted);
           background: white; border: 2px dashed var(--border); border-radius: 1.25rem;
         }
+        .modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--text); font-weight: 800; }
+        
+        .modal-body-scroll { padding: 1.5rem; max-height: 60vh; overflow-y: auto; }
+        
+        .analysis-section { margin-bottom: 2rem; }
+        .section-header { 
+          display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
+          color: var(--primary); font-size: 0.8rem; font-weight: 800; text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .section-icon { color: var(--primary); }
+        
+        .analysis-content-premium {
+          background: #f0f7ff; 
+          border: 1px solid #e0efff;
+          padding: 1.25rem;
+          border-radius: 1rem;
+          font-size: 1rem;
+          line-height: 1.7;
+          color: #1e293b;
+          white-space: pre-wrap;
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .modal-footer { 
+          padding: 1.25rem 1.5rem; border-top: 1px solid var(--border); 
+          display: flex; justify-content: flex-end; 
+          background: #f8fafc; border-bottom-left-radius: 1.25rem; border-bottom-right-radius: 1.25rem;
+        }
+        .modal-confirm-btn {
+          background: var(--primary); color: white; border: none; padding: 0.6rem 2rem;
+          border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+        }
+        .modal-confirm-btn:hover { background: #4338ca; transform: translateY(-2px); }
         .toast-message {
           position: fixed; bottom: 2rem; right: 2rem;
           background: #1e293b; color: white; padding: 1.25rem 2rem;
@@ -950,17 +957,15 @@ function App() {
         }
         .card-body { padding: 1rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         
-        .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-        .info-group label { 
-          display: block; font-size: 0.65rem; font-weight: 700; color: var(--text-muted); 
-          text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.2rem;
+        .summary-section { display: flex; flex-direction: column; gap: 0.5rem; }
+        .summary-section label { 
+          font-size: 0.75rem; font-weight: 800; color: var(--primary); 
+          text-transform: uppercase; letter-spacing: 0.05em;
         }
-        .info-group p { margin: 0; font-size: 0.85rem; font-weight: 500; color: var(--text); }
-        .info-group.danger p { color: var(--danger); font-weight: 600; }
-
-        .summary-text { 
-          background: #f8fafc; padding: 0.75rem 1rem; border-radius: 0.5rem; 
-          border: 1px solid #e2e8f0; font-size: 0.85rem; line-height: 1.6; color: #334155;
+        .summary-text-large { 
+          background: #f8fafc; padding: 1rem; border-radius: 0.75rem; 
+          border: 1px solid #e2e8f0; font-size: 0.9rem; line-height: 1.6;
+          color: #334155; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
         }
 
         .card-footer-action { padding: 0.4rem 0.75rem 0.8rem; display: flex; justify-content: flex-end; }
