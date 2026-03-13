@@ -558,21 +558,6 @@ function App() {
               <button className="close-btn" onClick={() => setSelectedPersona(null)}><X size={20} /></button>
             </div>
             <div className="modal-body-scroll">
-                <div className="analysis-grid-row">
-                  <div className="analysis-card">
-                    <div className="section-header"><Star size={16} /><span>주요 관심사</span></div>
-                    <p>{selectedPersona["주요 관심사"] || selectedPersona["관심사"] || "-"}</p>
-                  </div>
-                  <div className="analysis-card">
-                    <div className="section-header"><User size={16} /><span>질문 및 상담 성향</span></div>
-                    <p>{selectedPersona["질문 성향"] || selectedPersona["성향"] || "-"}</p>
-                  </div>
-                  <div className="analysis-card danger">
-                    <div className="section-header"><AlertTriangle size={16} /><span>핵심 감사 포인트</span></div>
-                    <p>{selectedPersona["예상 감사 포인트"] || selectedPersona["감사 포인트"] || "-"}</p>
-                  </div>
-                </div>
-
                 <div className="analysis-section">
                   <div className="section-header">
                     <MessageSquare size={16} className="section-icon" />
