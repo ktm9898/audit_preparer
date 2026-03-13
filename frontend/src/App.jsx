@@ -482,6 +482,9 @@ function App() {
                   <h2>실시간 이슈 및 리스크 분석</h2>
                 </div>
                 <div className="btn-group">
+                  <button className="action-btn secondary" onClick={fetchNews}>
+                    <Newspaper size={16} /> 관련 뉴스 수집
+                  </button>
                   <button className="action-btn primary" onClick={() => handleAction('risks')}>
                     <AlertTriangle size={16} /> 리스크 추출
                   </button>
