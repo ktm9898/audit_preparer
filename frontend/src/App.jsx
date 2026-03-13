@@ -428,10 +428,20 @@ function App() {
                           <span className="party-badge">{p.지역구 || p.소속 || "지역구 미확인"}</span>
                         </div>
                         <div className="card-body">
+                          <div className="metadata-grid">
+                            <div className="meta-item">
+                              <label>주요 관심사</label>
+                              <p>{p["주요 관심사"] || p["관심사"] || "-"}</p>
+                            </div>
+                            <div className="meta-item">
+                              <label>질문 성향</label>
+                              <p>{p["질문 성향"] || p["성향"] || "-"}</p>
+                            </div>
+                          </div>
                           <div className="summary-section">
-                            <label>발언 상세 및 요약 분석</label>
+                            <label>발언 상세 및 요약</label>
                             <div className="summary-text-large">
-                              {p.발언요약 || p.상세발언 || p["발언 요약"] || p["발언요약"] || "분석된 발언 내용이 없습니다. 분석 파이프라인을 실행해 주세요."}
+                              {p.발언요약 || p.상세발언 || p["발언 요약"] || p["발언요약"] || "-"}
                             </div>
                           </div>
                         </div>
@@ -539,18 +549,33 @@ function App() {
               <button className="close-btn" onClick={() => setSelectedPersona(null)}><X size={20} /></button>
             </div>
             <div className="modal-body-scroll">
-              <div className="analysis-section">
-                <div className="section-header">
-                  <MessageSquare size={16} className="section-icon" />
-                  <span>발언 상세 및 요약</span>
+                <div className="analysis-grid-row">
+                  <div className="analysis-card">
+                    <div className="section-header"><Star size={16} /><span>주요 관심사</span></div>
+                    <p>{selectedPersona["주요 관심사"] || selectedPersona["관심사"] || "-"}</p>
+                  </div>
+                  <div className="analysis-card">
+                    <div className="section-header"><User size={16} /><span>질문 및 상담 성향</span></div>
+                    <p>{selectedPersona["질문 성향"] || selectedPersona["성향"] || "-"}</p>
+                  </div>
+                  <div className="analysis-card danger">
+                    <div className="section-header"><AlertTriangle size={16} /><span>핵심 감사 포인트</span></div>
+                    <p>{selectedPersona["예상 감사 포인트"] || selectedPersona["감사 포인트"] || "-"}</p>
+                  </div>
                 </div>
+
+                <div className="analysis-section">
+                  <div className="section-header">
+                    <MessageSquare size={16} className="section-icon" />
+                    <span>상세 발언 기록 및 요약</span>
+                  </div>
                   <div className="analysis-content-premium">
                     {selectedPersona.발언요약 || selectedPersona["발언 요약"] || selectedPersona["발언요약"] || 
                      selectedPersona.상세발언 || selectedPersona["상세 발언"] || 
                      selectedPersona["발언 상세 및 요약"] || selectedPersona["상세 발언 기록 및 요약"] ||
-                     "분석된 발언 내용이 없거나 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요."}
+                     "분석된 데이터가 없습니다."}
                   </div>
-              </div>
+                </div>
             </div>
             <div className="modal-footer">
               <button className="modal-confirm-btn" onClick={() => setSelectedPersona(null)}>확인</button>
@@ -883,31 +908,20 @@ function App() {
           padding: 5rem 0; text-align: center; color: var(--text-muted);
           background: white; border: 2px dashed var(--border); border-radius: 1.25rem;
         }
-        .modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--text); font-weight: 800; }
-        
-        .modal-body-scroll { padding: 1.5rem; max-height: 60vh; overflow-y: auto; }
-        
-        .analysis-section { margin-bottom: 2rem; }
-        .section-header { 
-          display: flex !important; align-items: center !important; gap: 0.6rem !important; 
-          justify-content: flex-start !important; margin-bottom: 0.8rem;
-          color: var(--primary); font-size: 0.85rem; font-weight: 800;
+        .metadata-grid { 
+          display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; 
+          margin-bottom: 0.75rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.75rem;
         }
-        .section-icon { color: var(--primary); }
+        .meta-item label { display: block; font-size: 0.65rem; font-weight: 800; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.15rem; }
+        .meta-item p { margin: 0; font-size: 0.85rem; font-weight: 600; color: var(--text); }
+
+        .analysis-grid-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .analysis-card { background: #f8fafc; padding: 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; }
+        .analysis-card.danger { background: #fffafb; border-color: #fee2e2; }
+        .analysis-card.danger .section-header { color: var(--danger); }
+        .analysis-card p { margin: 0.5rem 0 0; font-size: 0.9rem; font-weight: 500; color: #334155; line-height: 1.5; }
         
-        .analysis-content-premium {
-          background: #f0f7ff; 
-          border: 1px solid #e0efff;
-          padding: 1.5rem;
-          border-radius: 1.25rem;
-          font-size: 1.05rem;
-          font-weight: 500;
-          line-height: 1.8;
-          color: #1e293b;
-          white-space: pre-wrap;
-          box-shadow: inset 0 2px 8px rgba(0,0,0,0.03);
-          letter-spacing: -0.01em;
-        }
+        .analysis-section { margin-bottom: 1rem; }
 
         .modal-footer { 
           padding: 1.25rem 1.5rem; border-top: 1px solid var(--border); 
