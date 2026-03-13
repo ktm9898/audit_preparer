@@ -522,12 +522,12 @@ function App() {
               
               <div className="news-list-grid">
                 {news.map((item, i) => (
-                  <a key={i} href={item.link || item.링크} target="_blank" rel="noreferrer" className="news-item-card">
-                    <div className="news-date">{item.date || item.날짜}</div>
-                    <h3 className="news-title">{item.title || item.제목}</h3>
-                    <p className="news-desc">{item.desc || item.본문내용 || item.내용 || "내용 요약 중..."}</p>
+                  <a key={i} href={item.link || item["링크"]} target="_blank" rel="noreferrer" className="news-item-card">
+                    <div className="news-date">{item.date || item["날짜"]}</div>
+                    <h3 className="news-title">{item.title || item["제목"]}</h3>
+                    <p className="news-desc">{item.desc || item["요약"] || item["본문내용"] || "내용 요약 중..."}</p>
                     <div className="news-footer">
-                      <span className="source-tag">{item.source || item.언론사 || "뉴스"}</span>
+                      <span className="source-tag">{item.source || item["언론사"] || "뉴스"}</span>
                       <ExternalLink size={12} />
                     </div>
                   </a>

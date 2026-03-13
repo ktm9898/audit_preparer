@@ -116,10 +116,10 @@ function fetchNewsFromNaver() {
   const query = "서울신용보증재단";
   let allItems = [];
   
-  // 최대 5페이지만 수집 (총 500건으로 제한하되, 양을 늘림)
-  for (let i = 0; i < 5; i++) {
+  // 최대 10페이지만 수집 (총 1000건 시도)
+  for (let i = 0; i < 10; i++) {
     const start = (i * 100) + 1;
-    const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=${start}&sort=sim`;
+    const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=${start}&sort=date`;
     const response = UrlFetchApp.fetch(url, {
       headers: { "X-Naver-Client-Id": CLIENT_ID, "X-Naver-Client-Secret": CLIENT_SECRET },
       muteHttpExceptions: true
@@ -132,6 +132,9 @@ function fetchNewsFromNaver() {
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['날짜', '언론사', '제목', '요약', '링크', '수집일']);
+  }
   const existingLinks = sheet.getRange("E:E").getValues().flat().map(String);
   
   const newNews = allItems.filter(item => !existingLinks.includes(item.originallink || item.link))
@@ -145,11 +148,11 @@ function fetchNewsFromNaver() {
 
   if (newNews.length === 0) return { ok: true, message: "새로운 뉴스가 없습니다.", count: 0 };
 
-  // Gemini를 이용한 중복 제거 및 중요도 필터링
+  // AI 필터링을 조금 더 넉넉하게 가져가거나, 일단 다 가져온 뒤 크롤링
   const cleanedNews = cleanNewsWithAI(newNews);
   
-  // 선별된 뉴스에 대해 본문 크롤링 시도 (상위 20개만)
-  const finalNews = crawlNewsContent(cleanedNews.slice(0, 20));
+  // 크롤링 수량을 100개로 확대
+  const finalNews = crawlNewsContent(cleanedNews.slice(0, 100));
 
   if (finalNews.length > 0) {
     const lastRow = sheet.getLastRow();
@@ -192,15 +195,15 @@ function extractTextWithAI(html, apiKey) {
 // --- Gemini AI를 이용한 뉴스 정제 ---
 function cleanNewsWithAI(newsList) {
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
-  if (!API_KEY) return newsList; // 키 없으면 그냥 반환
+  if (!API_KEY) return newsList.slice(0, 100); 
 
   const context = newsList.map((n, i) => `${i}. [${n.title}] ${n.desc}`).join("\n");
-  const prompt = `당신은 뉴스 편집자입니다. 아래 '서울신용보증재단' 관련 뉴스 목록에서 중복된 이슈를 제거하고, 행정감사 관점에서 중요한 뉴스만 골라주세요.
-중요도가 낮은 홍보성 기사는 제외하세요.
-응답은 반드시 JSON 배열로, 선택한 뉴스의 인덱스 번호만 주세요. 예: [0, 2, 5]
+  const prompt = `당신은 뉴스 편집자입니다. 아래 '서울신용보증재단' 관련 뉴스 목록에서 중복 이슈를 제거하고 중요 뉴스 약 100개를 골라주세요. 
+항목이 부족하면 최대한 많이 선택하세요. 홍보성이라도 재단 관련이면 포함하세요.
+응답은 반드시 JSON 배열로 선택한 인덱스 번호만 주세요. 예: [0, 1, 2, ...]
 
 목록:
-${context}`;
+${context.substring(0, 30000)}`;
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`;
@@ -209,12 +212,13 @@ ${context}`;
       generationConfig: { responseMimeType: "application/json" }
     };
     const response = UrlFetchApp.fetch(url, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload) });
-    const indices = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text;
-    const selectedIndices = typeof indices === 'string' ? JSON.parse(indices) : indices;
+    const indicesStr = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text;
+    const selectedIndices = typeof indicesStr === 'string' ? JSON.parse(indicesStr) : indicesStr;
     
     return newsList.filter((_, i) => selectedIndices.includes(i));
   } catch (e) {
-    return newsList.slice(0, 10); // 에러 시 상위 10개만
+    console.warn("AI 필터링 실패, 단순 슬라이싱으로 대체:", e.message);
+    return newsList.slice(0, 100);
   }
 }
 
