@@ -343,9 +343,6 @@ function App() {
               <button className={activeTab === 'questions' ? 'active' : ''} onClick={() => setActiveTab('questions')}>
                 <MessageSquare size={18} /> <span>예상 질문</span>
               </button>
-              <button className={activeTab === 'news' ? 'active' : ''} onClick={() => setActiveTab('news')}>
-                <Newspaper size={18} /> <span>최근 뉴스</span>
-              </button>
             </nav>
           </div>
         </div>
@@ -385,9 +382,9 @@ function App() {
                 <StatCard 
                   title="수집된 관련 뉴스" 
                   value={`${newsCount}건`} 
-                  icon={RefreshCw} 
+                  icon={Newspaper} 
                   color="green"
-                  onClick={fetchNews}
+                  onClick={() => setActiveTab('risks')}
                 />
                 <StatCard 
                   title="최종 대비 예상 질문" 
@@ -449,9 +446,11 @@ function App() {
                             <p className="line-clamp-2">{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || p["예상 공격 전략"] || "-"}</p>
                           </div>
                         </div>
-                        <button className="card-more-btn" onClick={() => setSelectedPersona(p)}>
-                          상세보기 <ChevronRight size={14} />
-                        </button>
+                        <div className="card-footer-action">
+                          <button className="card-more-btn" onClick={() => setSelectedPersona(p)}>
+                            상세보기 <ChevronRight size={14} />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -480,62 +479,63 @@ function App() {
                   <h2>실시간 이슈 및 리스크 분석</h2>
                 </div>
                 <div className="btn-group">
-                  <button className="action-btn" onClick={fetchNews}>
-                    <RefreshCw size={16} /> 뉴스 수집
-                  </button>
                   <button className="action-btn primary" onClick={() => handleAction('risks')}>
                     <AlertTriangle size={16} /> 리스크 추출
                   </button>
                 </div>
               </div>
-              
-              <div className="list-container">
-                {risks.map((r, i) => (
-                  <div key={i} className="list-item-card">
-                    <div className="item-icon"><ShieldAlert size={20} /></div>
-                    <div className="item-content">
-                      <h3>{r["리스크 요인"]}</h3>
-                      <p>{r["세부 내용"]}</p>
-                      <div className="item-meta">근거 데이터: {r["관련 근거"]}</div>
-                    </div>
-                    <CheckCircle2 size={24} className="check-icon" />
+
+              <div className="risks-layout">
+                <div className="risks-main">
+                  <div className="section-title-sm">분석된 리스크 요인 ({risks.length})</div>
+                  <div className="list-container">
+                    {risks.map((r, i) => (
+                      <div key={i} className="list-item-card">
+                        <div className="item-icon"><ShieldAlert size={20} /></div>
+                        <div className="item-content">
+                          <h3>{r["리스크 요인"]}</h3>
+                          <p>{r["세부 내용"]}</p>
+                          <div className="item-meta">근거 데이터: {r["관련 근거"]}</div>
+                        </div>
+                        <CheckCircle2 size={24} className="check-icon" />
+                      </div>
+                    ))}
+                    {risks.length === 0 && (
+                      <div className="empty-state">분석된 리스크 요인이 없습니다.</div>
+                    )}
                   </div>
-                ))}
-                {risks.length === 0 && (
-                  <div className="empty-state">분석된 리스크 요인이 없습니다.</div>
-                )}
+                </div>
+
+                <div className="risks-sub">
+                  <div className="section-header-sm">
+                    <div className="title-row">
+                      <Newspaper size={18} />
+                      <span className="txt">수집된 근거 뉴스</span>
+                    </div>
+                    <button className="refresh-mini-btn" onClick={fetchNews} title="뉴스 새로고침">
+                      <RefreshCw size={14} className={loading ? 'spin' : ''} />
+                    </button>
+                  </div>
+                  <div className="mini-news-list">
+                    {news.map((item, i) => (
+                      <a key={i} href={item.link || item["링크"]} target="_blank" rel="noreferrer" className="mini-news-card">
+                        <span className="date">{item.date || item["날짜"]}</span>
+                        <div className="title">{item.title || item["제목"]}</div>
+                        <p>{item.desc || item["요약"] || "내용 요약 중..."}</p>
+                      </a>
+                    ))}
+                    {news.length === 0 && (
+                      <div className="empty-state-sm">뉴스가 없습니다.</div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
           {activeTab === 'news' && (
             <div className="view-tab fade-in">
-              <div className="section-header">
-                <div className="title-row">
-                  <Newspaper size={24} className="title-icon" />
-                  <h2>수집된 최근 뉴스 목록</h2>
-                </div>
-                <button className="action-btn" onClick={fetchNews}>
-                  <RefreshCw size={16} /> 뉴스 수집 실행
-                </button>
-              </div>
-              
-              <div className="news-list-grid">
-                {news.map((item, i) => (
-                  <a key={i} href={item.link || item["링크"]} target="_blank" rel="noreferrer" className="news-item-card">
-                    <div className="news-date">{item.date || item["날짜"]}</div>
-                    <h3 className="news-title">{item.title || item["제목"]}</h3>
-                    <p className="news-desc">{item.desc || item["요약"] || item["본문내용"] || "내용 요약 중..."}</p>
-                    <div className="news-footer">
-                      <span className="source-tag">{item.source || item["언론사"] || "뉴스"}</span>
-                      <ExternalLink size={12} />
-                    </div>
-                  </a>
-                ))}
-                {news.length === 0 && (
-                  <div className="empty-state">수집된 뉴스가 없습니다. '뉴스 수집'을 실행해 주세요.</div>
-                )}
-              </div>
+              {/* 제거됨 */}
             </div>
           )}
         </div>
@@ -938,66 +938,62 @@ function App() {
           display: flex; justify-content: space-between; align-items: center;
           background: linear-gradient(to right, #f8fafc, #ffffff);
         }
-        .card-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+        .card-body { padding: 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
         
-        .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
         .info-group label { 
-          display: block; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); 
-          text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;
+          display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); 
+          text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;
         }
-        .info-group p { margin: 0; font-size: 0.95rem; font-weight: 500; color: var(--text); }
+        .info-group p { margin: 0; font-size: 0.9rem; font-weight: 500; color: var(--text); }
         .info-group.danger p { color: var(--danger); font-weight: 600; }
 
         .summary-text { 
-          background: #f8fafc; padding: 0.75rem; border-radius: 0.5rem; 
-          border: 1px dashed var(--border); font-size: 0.9rem; line-height: 1.6;
+          background: #f8fafc; padding: 0.6rem; border-radius: 0.4rem; 
+          border: 1px dashed var(--border); font-size: 0.85rem; line-height: 1.5;
         }
 
-        /* News List Grid */
-        .news-list-grid { 
-          display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); 
-          gap: 1.5rem; margin-top: 1.5rem; 
+        .card-footer-action { padding: 0.5rem 1rem 1rem; display: flex; justify-content: flex-end; }
+        .card-more-btn {
+          background: transparent; color: var(--primary); border: none;
+          font-size: 0.85rem; font-weight: 700; padding: 0.4rem 0.6rem;
+          display: flex; align-items: center; gap: 0.2rem; cursor: pointer;
+          border-radius: 4px; transition: all 0.2s;
         }
-        .news-item-card {
-          background: white; border-radius: 1.25rem; padding: 1.75rem; text-decoration: none; color: inherit;
-          border: 1px solid var(--border); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          display: flex; flex-direction: column; gap: 0.75rem; position: relative; overflow: hidden;
-        }
-        .news-item-card::before {
-          content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
-          background: var(--primary); opacity: 0; transition: opacity 0.3s;
-        }
-        .news-item-card:hover { 
-          transform: translateX(5px); box-shadow: var(--shadow-lg); border-color: var(--primary); 
-        }
-        .news-item-card:hover::before { opacity: 1; }
+        .card-more-btn:hover { background: var(--primary-light); }
 
-        /* Modal Premium Enhancements */
-        .modal-overlay {
-          background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px);
-          display: flex; align-items: center; justify-content: center; z-index: 1000;
+        /* Risks Layout */
+        .risks-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; margin-top: 1rem; }
+        .risks-main { min-width: 0; }
+        .risks-sub { 
+          background: white; border-radius: 1rem; border: 1px solid var(--border); 
+          display: flex; flex-direction: column; height: fit-content; max-height: 80vh;
         }
-        .detail-modal {
-          max-height: 90vh; overflow-y: auto; border-radius: 2rem;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-          animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        .section-header-sm {
+          padding: 1rem; border-bottom: 1px solid var(--border);
+          display: flex; justify-content: space-between; align-items: center;
+          background: #fcfdfe; border-radius: 1rem 1rem 0 0;
         }
-        @keyframes modalSlideUp {
-          from { opacity: 0; transform: translateY(20px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
+        .section-header-sm .title-row { display: flex; align-items: center; gap: 0.5rem; color: var(--text); font-weight: 700; font-size: 0.95rem; }
+        .refresh-mini-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
+        .refresh-mini-btn:hover { color: var(--primary); }
 
-        .tag-cloud { display: flex; flex-wrap: wrap; gap: 0.6rem; }
-        .interest-tag { 
-          background: var(--primary-light); color: var(--primary); border: none;
-          padding: 0.5rem 1rem; border-radius: 2rem; font-size: 0.85rem; font-weight: 700;
-          box-shadow: 0 2px 4px rgba(79, 70, 229, 0.1);
+        .mini-news-list { padding: 0.75rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; }
+        .mini-news-card {
+          padding: 0.75rem; border-radius: 0.75rem; border: 1px solid var(--border);
+          text-decoration: none; color: inherit; transition: all 0.2s; display: flex; flex-direction: column; gap: 0.25rem;
         }
+        .mini-news-card:hover { border-color: var(--primary); background: #fdfdff; transform: translateX(3px); }
+        .mini-news-card .date { font-size: 0.7rem; color: var(--text-muted); }
+        .mini-news-card .title { font-size: 0.85rem; font-weight: 700; line-height: 1.4; color: var(--text); }
+        .mini-news-card p { font-size: 0.8rem; color: var(--text-muted); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-        /* Responsive Fixes */
-        @media (max-width: 640px) {
-          .info-row { grid-template-columns: 1fr; }
-          .detail-grid { grid-template-columns: 1fr; }
+        .section-title-sm { font-size: 0.9rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.75rem; }
+        .empty-state-sm { padding: 2rem 1rem; text-align: center; font-size: 0.85rem; color: var(--text-muted); }
+
+        @media (max-width: 1024px) {
+          .risks-layout { grid-template-columns: 1fr; }
+          .risks-sub { max-height: 400px; }
         }
       `}</style>
     </div>
