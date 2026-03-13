@@ -123,14 +123,14 @@ function fetchNewsFromNaver() {
     `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=101&sort=sim`
   ];
 
-  const headers = {
+  const apiHeaders = {
     "X-Naver-Client-Id": CLIENT_ID,
     "X-Naver-Client-Secret": CLIENT_SECRET
   };
 
   searchUrls.forEach(url => {
     try {
-      const response = UrlFetchApp.fetch(url, { headers, muteHttpExceptions: true });
+      const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
       if (response.getResponseCode() === 200) {
         const data = JSON.parse(response.getContentText());
         if (data.items) allItems.push(...data.items);
