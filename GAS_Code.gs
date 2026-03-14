@@ -293,24 +293,23 @@ function fetchNewsFromNaver(targetMonth) {
     })
     .slice(0, 15);
 
-  console.log(`정예 선별 완료: ${finalTop15.length}건. (Screened: ${finalTop15.map(n=>n.importance).join(', ')})`);
-
   // [Stage 2 & 3] 정예 15건에 대해서만 전문 크롤링 및 분석 수행
   const crawledNews = crawlNewsContent(finalTop15);
+  // 분석 전, 스크리닝에서 얻은 중요도와 카테고리를 백업 (분석 실패 시 대비)
   const resultNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
 
   // 4. 시트에 데이터 추가 (Append)
   if (resultNews.length > 0) {
     const rows = resultNews.map(n => [
       n.date, 
-      n.category || "일반", 
-      n.source, 
+      n.category || "-", // '주제' 컬럼
+      n.source || "뉴스", 
       n.title, 
       n.naverDesc, 
       n.fullText || "", 
       n.link, 
       n.aiSummary || n.naverDesc,
-      n.importance
+      n.importance || "-"
     ]);
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   }
@@ -399,10 +398,11 @@ ${newsDataForAI}`;
 }
 
 // --- 3단계: AI 전문 정밀 분석 (본문 기반) ---
-function deepAnalyzeNewsWithAI(newsList, apiKey) {
-  if (!apiKey || newsList.length === 0) return newsList;
-
   return newsList.map(item => {
+    // 분석 전 스크리닝 결과 백업
+    const prevImportance = item.importance;
+    const prevCategory = item.category;
+
     let analyzeSource = "";
     if (!item.fullText || item.fullText.length < 100) {
       console.log(`기사 본문 부족(${item.fullText?.length || 0}자). 네이버 요약 기반 분석 진행: ${item.title}`);
@@ -434,24 +434,31 @@ ${analyzeSource}
       
       if (resp.getResponseCode() === 200) {
         const resJson = JSON.parse(resp.getContentText());
-        let feedback = resJson.candidates[0].content.parts[0].text.trim();
-        
-        // JSON 추출 안정화
-        if (feedback.startsWith('```')) {
-          feedback = feedback.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+        if (resJson.candidates && resJson.candidates[0].content && resJson.candidates[0].content.parts) {
+          let feedback = resJson.candidates[0].content.parts[0].text.trim();
+          
+          if (feedback.startsWith('```')) {
+            feedback = feedback.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+          }
+          const jsonStart = feedback.indexOf('{');
+          const jsonEnd = feedback.lastIndexOf('}') + 1;
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            feedback = feedback.substring(jsonStart, jsonEnd);
+          }
+          
+          const parsed = JSON.parse(feedback);
+          item.aiSummary = parsed.summary || item.naverDesc;
+          item.importance = parsed.importance || prevImportance;
+          item.category = parsed.category || prevCategory;
         }
-        const jsonStart = feedback.indexOf('{');
-        const jsonEnd = feedback.lastIndexOf('}') + 1;
-        if (jsonStart !== -1 && jsonEnd !== -1) {
-          feedback = feedback.substring(jsonStart, jsonEnd);
-        }
-        
-        const parsed = JSON.parse(feedback);
-        item.aiSummary = parsed.summary;
-        item.importance = parsed.importance;
-        item.category = parsed.category;
       }
-    } catch (e) { console.error("Deep Analysis AI Error:", e.message); }
+    } catch (e) { 
+      console.error("Deep Analysis AI Error:", e.message);
+      // AI 분석 실패 시 스크리닝 결과 유지
+      item.aiSummary = item.naverDesc;
+      item.importance = prevImportance;
+      item.category = prevCategory;
+    }
     return item;
   });
 }

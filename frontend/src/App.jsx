@@ -513,9 +513,15 @@ function App() {
                   <label><Users size={14} /> 시점 필터</label>
                   <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
                     <option value="all">전체 기간</option>
-                    {(news || []).length > 0 && [...new Set(news.map(n => n?.날짜 || n?.date))].filter(Boolean).sort().reverse().map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
+                    {(news || [])
+                      .filter(Boolean)
+                      .map(n => n.날짜 || n.date)
+                      .filter(Boolean)
+                      .reduce((acc, curr) => (acc.includes(curr) ? acc : [...acc, curr]), [])
+                      .sort()
+                      .reverse()
+                      .map(m => <option key={m} value={m}>{m}</option>)
+                    }
                   </select>
                 </div>
                 <div className="search-group">
@@ -545,11 +551,17 @@ function App() {
                         if (!news || news.length === 0) {
                           return <tr><td colSpan="5" className="empty-row">수집된 뉴스가 없습니다. 연월을 선택해 수집을 시작하세요.</td></tr>;
                         }
-                        const filteredNews = news
-                          .filter(item => item && (filterMonth === 'all' || (item.날짜 || item.date) === filterMonth))
+                        const filteredNews = (news || [])
                           .filter(item => {
-                            const searchStr = (item.제목 || item.title || "") + (item.AI요약 || item.aiSummary || "") + (item.분야 || item.category || "");
-                            return searchStr.toLowerCase().includes(searchTerm.toLowerCase());
+                            if (!item) return false;
+                            const itemMonth = item.날짜 || item.date;
+                            if (filterMonth !== 'all' && itemMonth !== filterMonth) return false;
+                            
+                            const title = item.제목 || item.title || "";
+                            const summary = item.AI요약 || item.aiSummary || item.naverDesc || "";
+                            const category = item.분야 || item.주제 || item.category || "";
+                            const searchStr = (title + summary + category).toLowerCase();
+                            return searchStr.includes(searchTerm.toLowerCase());
                           });
 
                         if (filteredNews.length === 0) {
@@ -559,10 +571,10 @@ function App() {
                         return filteredNews.map((item, idx) => {
                           if (!item) return null;
                           const importance = item.중요도 || item.importance || '하';
-                          const category = item.분야 || item.category || '기타';
+                          const category = item.분야 || item.주제 || item.category || '기타';
                           const title = item.제목 || item.title || '제목 없음';
                           const source = item.언론사 || item.source || '뉴스';
-                          const date = (item.날짜 || item.date || '오늘').split(' ')[0];
+                          const date = String(item.날짜 || item.date || '오늘').split(' ')[0];
                           const summary = item.AI요약 || item.aiSummary || item.naverDesc || '내용 없음';
 
                           return (
