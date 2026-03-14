@@ -146,35 +146,48 @@ function fetchNewsFromNaver(targetMonth) {
   const allItems = [];
   const apiHeaders = { "X-Naver-Client-Id": CLIENT_ID, "X-Naver-Client-Secret": CLIENT_SECRET };
 
-  // 1. 기간 설정 및 수집
+  // 1. 기간 설정 및 심층 수집 (Paging 적용)
   if (targetMonth) {
-    console.log(`[수집 시작] 대상 연월: ${targetMonth}`);
-    const queries = [
-      `${baseQuery} ${targetMonth}`, // 형식 1: "서울신용보증재단 2024.03"
-      baseQuery                      // 형식 2: "서울신용보증재단" (가져온 후 코드에서 날짜 필터링)
-    ];
+    console.log(`[심층 수집 시작] 대상 연월: ${targetMonth}`);
+    const displayCount = 100; // 한 번에 가져올 최대 개수
+    let stopSearch = false;
 
-    queries.forEach((q, qIdx) => {
-      ['sim', 'date'].forEach(sort => {
-        // 이미 충분한 아이템을 확보했다면 (폴백 쿼리인 경우) 스킵 가능하지만, 정확도를 위해 진행
-        const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(q)}&display=100&start=1&sort=${sort}`;
+    // 최대 1,000건까지 페이지를 넘기며 탐색
+    for (let start = 1; start <= 1000; start += displayCount) {
+      if (stopSearch) break;
+
+      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(baseQuery)}&display=${displayCount}&start=${start}&sort=date`;
+      try {
         const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
         if (response.getResponseCode() === 200) {
           const data = JSON.parse(response.getContentText());
-          if (data.items) {
-            // (핵심) 코드단에서 실제 날짜 필터링 수행
-            const filtered = data.items.filter(item => {
-              const pubDate = new Date(item.pubDate);
-              const itemYM = Utilities.formatDate(pubDate, "GMT+9", "yyyy.MM");
-              return itemYM === targetMonth;
-            });
-            console.log(`[${q} / ${sort}] 결과 ${data.items.length}건 중 필터 조건(${targetMonth}) 부합: ${filtered.length}건`);
-            allItems.push(...filtered);
+          if (!data.items || data.items.length === 0) break;
+
+          console.log(`[페이지 ${start}~] ${data.items.length}건 수신...`);
+
+          for (const item of data.items) {
+            const pubDate = new Date(item.pubDate);
+            const itemYM = Utilities.formatDate(pubDate, "GMT+9", "yyyy.MM");
+
+            if (itemYM === targetMonth) {
+              allItems.push(item);
+            } else if (itemYM < targetMonth) {
+              // 검색 결과가 대상 월보다 과거로 넘어감 -> 탐색 중단
+              console.log(`[중단] 과거 데이터 발견 (${itemYM} < ${targetMonth}). 루프를 종료합니다.`);
+              stopSearch = true;
+              break;
+            }
           }
+        } else {
+          console.error(`Naver API 페이지 호출 실패 (Code: ${response.getResponseCode()})`);
+          break;
         }
-      });
-      if (allItems.length > 20 && qIdx === 0) return; // 첫 번째 쿼리에서 충분히 나왔으면 중단
-    });
+      } catch (e) {
+        console.error(`Fetch API Error: ${e.message}`);
+        break;
+      }
+    }
+    console.log(`[수집 완료] 총 후보 기사 ${allItems.length}건 확보 (필터링 전)`);
   } else {
     // 월 지정이 없으면 전체 흐름 (최근 12개월 루프)
     const now = new Date();
