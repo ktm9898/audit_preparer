@@ -333,6 +333,7 @@ function crawlNewsContent(newsList) {
         headers: { "User-Agent": userAgent }
       };
       const response = UrlFetchApp.fetch(item.link, options);
+      if (response.getResponseCode() === 200) {
         let html = response.getContentText();
         // 본문 점유율을 높이기 위해 불필요한 태그 제거 (구조는 최소한 유지)
         html = html.replace(/<(script|style|nav|header|footer|iframe|svg|aside)[^>]*>([\s\S]*?)<\/\1>/gi, '');
