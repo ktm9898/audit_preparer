@@ -483,15 +483,14 @@ function App() {
               </div>
 
               <div className="news-table-container premium-shadow">
-                <div className="section-title-sm">수집된 관련 뉴스 ({newsCount}건)</div>
                 <div className="table-responsive">
                   <table className="premium-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '80px' }}>상태</th>
-                        <th style={{ width: '250px' }}>기사</th>
+                        <th style={{ width: '100px' }}>상태</th>
+                        <th style={{ width: '350px' }}>기사</th>
                         <th>요약</th>
-                        <th style={{ width: '100px' }}>원문</th>
+                        <th style={{ width: '80px' }}>원문</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -506,13 +505,14 @@ function App() {
                               <span className={`importance-badge ${item.중요도 === '상' ? 'high' : item.중요도 === '중' ? 'mid' : 'low'}`}>
                                 {item.중요도 || '하'}
                               </span>
+                              <div className="category-label">#{item.분야 || item.category || '기타'}</div>
                             </td>
                             <td className="info-cell">
-                              <div className="news-title-mini">{item.제목 || item.title}</div>
+                              <div className="news-title-premium">{item.제목 || item.title}</div>
                               <div className="news-meta-mini">
-                                <span className="source">{item.언론사 || "뉴스"}</span>
+                                <span className="source">{item.언론사 || item.source || "뉴스"}</span>
                                 <span className="dot">·</span>
-                                <span className="date">{item.날짜 || "오늘"}</span>
+                                <span className="date">{(item.날짜 || "").split(' ')[0] || "오늘"}</span>
                               </div>
                             </td>
                             <td className="summary-cell">
@@ -521,8 +521,8 @@ function App() {
                               </div>
                             </td>
                             <td className="action-cell">
-                              <a href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="icon-link-btn" onClick={e => e.stopPropagation()}>
-                                <ArrowUpRight size={16} /> 원문
+                              <a href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="icon-link-circle" onClick={e => e.stopPropagation()}>
+                                <ExternalLink size={16} />
                               </a>
                             </td>
                           </tr>
@@ -658,8 +658,9 @@ function App() {
                   <span className={`importance-badge ${selectedNews.중요도 === '상' ? 'high' : selectedNews.중요도 === '중' ? 'mid' : 'low'}`}>
                     {selectedNews.중요도 || '하'}
                   </span>
-                  <span className="source-tag">{selectedNews.언론사 || "뉴스"}</span>
-                  <span className="date-tag">{selectedNews.날짜}</span>
+                  <span className="source-tag">{selectedNews.언론사 || selectedNews.source || "뉴스"}</span>
+                  <span className="date-tag">{(selectedNews.날짜 || "").split(' ')[0]}</span>
+                  <span className="category-tag-modal">#{selectedNews.분야 || selectedNews.category || '기타'}</span>
                 </div>
                 <h2 className="news-detail-title">{selectedNews.제목 || selectedNews.title}</h2>
                 <a href={selectedNews.링크 || selectedNews.link} target="_blank" rel="noopener noreferrer" className="source-link">
@@ -1192,22 +1193,29 @@ function App() {
         .importance-badge.mid { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
         .importance-badge.low { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
 
+        .category-label { font-size: 0.65rem; color: var(--text-muted); font-weight: 700; margin-top: 0.4rem; opacity: 0.8; }
+        .category-tag-modal { 
+          margin-left: auto; padding: 4px 10px; border-radius: 4px; 
+          background: #f1f5f9; color: var(--primary); font-size: 0.75rem; font-weight: 800; 
+        }
+
         .date-cell { font-size: 0.85rem; color: var(--text-muted); font-weight: 600; font-family: 'Inter', sans-serif; }
         .source-badge { 
           display: inline-block; padding: 4px 10px; border-radius: 6px; 
           background: #f1f5f9; color: var(--text-muted); font-size: 0.75rem; font-weight: 800;
         }
-        .news-title-link { font-size: 1.05rem; font-weight: 800; color: var(--text); margin-bottom: 0.6rem; line-height: 1.5; color: #1e293b; }
+        .news-title-premium { font-size: 1rem; font-weight: 800; color: #1e293b; margin-bottom: 0.4rem; line-height: 1.4; letter-spacing: -0.01em; }
         .news-summary-text { 
-           font-size: 0.9rem; color: #475569; line-height: 1.7;
+           font-size: 0.9rem; color: #475569; line-height: 1.6;
            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
-        .icon-link-btn {
+        .icon-link-circle {
           display: flex; align-items: center; justify-content: center;
-          width: 2.5rem; height: 2.5rem; border-radius: 0.5rem;
-          color: var(--primary); transition: all 0.2s;
+          width: 2.2rem; height: 2.2rem; border-radius: 50%;
+          border: 1px solid var(--border);
+          color: var(--text-muted); transition: all 0.2s;
         }
-        .icon-link-btn:hover { background: var(--primary-light); }
+        .icon-link-circle:hover { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
         .empty-row { padding: 4rem 0; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
 
         /* Pipeline Styles */
