@@ -223,7 +223,8 @@ function fetchNewsFromNaver(targetMonth) {
       
       let sourceName = "뉴스";
       try {
-        // [수정] 도메인 추출 시 네이버 인링크(`link`)가 아닌 원본 링크(`originallink`)를 사용하여 원래 언론사명을 찾음
+        // [안내] 실제 수집 및 저장용 링크(link)는 네이버 인링크를 유지하여 크롤링 안정성을 확보합니다.
+        // 다만 언론사 명칭(sourceName)을 정확히 찾기 위해서만 원본 링크(originallink)를 도메인 판별용으로 참조합니다.
         const sourceUrl = item.originallink || link;
         const domain = sourceUrl.split('/')[2].replace('www.', '').replace('m.', '');
         const domainMap = { 
