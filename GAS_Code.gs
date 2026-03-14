@@ -138,10 +138,13 @@ function fetchNewsFromNaver() {
 
   const query = "서울신용보증재단";
   const allItems = [];
-  const searchUrls = [
-    `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=1&sort=sim`,
-    `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=1&sort=date`,
-    `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=101&sort=sim`
+  
+  // 1. 기간별 분산 수집을 위한 멀티 검색 (Sim/Date 혼합 및 페이징)
+  const searchConfigs = [
+    { sort: 'sim', start: 1 },
+    { sort: 'sim', start: 101 },
+    { sort: 'date', start: 1 },
+    { sort: 'date', start: 101 }
   ];
 
   const apiHeaders = {
@@ -149,14 +152,13 @@ function fetchNewsFromNaver() {
     "X-Naver-Client-Secret": CLIENT_SECRET
   };
 
-  searchUrls.forEach(url => {
+  searchConfigs.forEach(cfg => {
     try {
+      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=${cfg.start}&sort=${cfg.sort}`;
       const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
       if (response.getResponseCode() === 200) {
         const data = JSON.parse(response.getContentText());
         if (data.items) allItems.push(...data.items);
-      } else {
-        console.warn(`Naver API Fetch Error for URL: ${url}, Response Code: ${response.getResponseCode()}, Content: ${response.getContentText()}`);
       }
     } catch (e) {
       console.error("Naver API Fetch Error: " + e.message);
@@ -164,6 +166,42 @@ function fetchNewsFromNaver() {
   });
 
   if (allItems.length === 0) return { ok: false, error: "뉴스를 가져오지 못했습니다." };
+
+  // 2. 데이터 정제 및 월별 그룹화
+  const processedItems = allItems.map(item => {
+    const link = item.originallink || item.link;
+    const title = item.title.replace(/<[^>]+>/g, "");
+    const date = new Date(item.pubDate);
+    const dateStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM-dd");
+    const monthStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM");
+    return { ...item, cleanTitle: title, cleanLink: link, dateStr, monthStr };
+  });
+
+  // 중복 제거 (URL 기준)
+  const uniqueItems = [];
+  const visitedLinks = new Set();
+  processedItems.forEach(item => {
+    if (!visitedLinks.has(item.cleanLink) && isTrustedMedia(item.cleanLink)) {
+      visitedLinks.add(item.cleanLink);
+      uniqueItems.push(item);
+    }
+  });
+
+  // 월별로 그룹화
+  const monthlyGroups = {};
+  uniqueItems.forEach(item => {
+    if (!monthlyGroups[item.monthStr]) monthlyGroups[item.monthStr] = [];
+    monthlyGroups[item.monthStr].push(item);
+  });
+
+  // 월별로 최대 15개씩 샘플링하여 총 120~150개 확보
+  const sampledItems = [];
+  Object.keys(monthlyGroups).sort((a,b) => b.localeCompare(a)).forEach(month => {
+    const monthItems = monthlyGroups[month]
+      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+      .slice(0, 15);
+    sampledItems.push(...monthItems);
+  });
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
@@ -176,23 +214,20 @@ function fetchNewsFromNaver() {
   if (sheet.getRange(1, 1).getValue() !== '날짜' || sheet.getLastColumn() < headers.length) {
     sheet.clear().appendRow(headers);
   }
-  const existingLinks = sheet.getLastRow() > 1 ? sheet.getRange("G:G").getValues().flat().map(String) : []; // 링크 컬럼이 G로 이동
-  const existingTitles = sheet.getLastRow() > 1 ? sheet.getRange("D:D").getValues().flat().map(String) : []; // 제목 컬럼이 D로 이동
+  const existingLinks = sheet.getLastRow() > 1 ? sheet.getRange("G:G").getValues().flat().map(String) : [];
+  const existingTitles = sheet.getLastRow() > 1 ? sheet.getRange("D:D").getValues().flat().map(String) : [];
   
-  const newNews = allItems.filter(item => {
-                          const link = item.originallink || item.link;
-                          const title = item.title.replace(/<[^>]+>/g, "");
-                          // 1. 중복 제거 2. 주요 언론사 필터링
-                          return !existingLinks.includes(link) && !existingTitles.includes(title) && isTrustedMedia(link);
+  const newNews = sampledItems.filter(item => {
+                          return !existingLinks.includes(item.cleanLink) && !existingTitles.includes(item.cleanTitle);
                         })
                         .map(item => ({
-                          date: Utilities.formatDate(new Date(item.pubDate), "GMT+9", "yyyy-MM-dd"),
+                          date: item.dateStr,
                           topic: "서울신용보증재단",
                           source: "뉴스",
-                          title: item.title.replace(/<[^>]+>/g, ""),
+                          title: item.cleanTitle,
                           naverDesc: item.description.replace(/<[^>]+>/g, ""),
                           fullText: "", 
-                          link: item.originallink || item.link,
+                          link: item.cleanLink,
                           aiSummary: "", 
                           importance: "-"
                         }))
@@ -235,6 +270,26 @@ function fetchNewsFromNaver() {
   return { ok: true, count: finalNews.length };
 }
 
+// --- 추가: 기사 본문 수집 함수 (crawlNewsContent) ---
+function crawlNewsContent(newsList) {
+  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  return newsList.map(item => {
+    try {
+      const response = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, timeoutSeconds: 30 });
+      if (response.getResponseCode() === 200) {
+        const html = response.getContentText();
+        const extracted = extractTextWithAI(html, API_KEY, item.title, item.link);
+        if (extracted) {
+          item.fullText = extracted;
+        }
+      }
+    } catch (e) {
+      console.warn(`기사 본문 수집 실패: ${item.link}, ${e.message}`);
+    }
+    return item;
+  });
+}
+
 // --- 1단계: AI 뉴스 스크리닝 (제목/요약 기반) ---
 function screenImportanceWithAI(newsList, apiKey) {
   if (!apiKey || newsList.length === 0) return newsList;
@@ -244,8 +299,8 @@ function screenImportanceWithAI(newsList, apiKey) {
 아래 뉴스 리스트를 분석하여 2가지 작업을 수행하세요.
 
 [수행 작업]
-1. 중요도 판별: '서울신용보증재단', '소상공인 지원 정책', '상권 분석', '지방자치단체 업무보고'와의 연관성에 따라 '상', '중', '하'를 매기세요.
-2. 중복 제거: 동일한 사건을 다루는 뉴스가 여러 개라면, 가장 제목이 명확하고 내용이 풍부해 보이는 1개만 '상' 또는 '중'으로 남기고 나머지는 무조건 '하'로 강등시키세요.
+1. 중요도 판별: '서울신용보증재단', '소상공인 지원 정책', '상권 분석', '지방자치단체 업무보고'와의 연관성에 따라 '상', '중', '하'를 매기세요. 특히 재단에 대한 비판적이거나 리스크가 될 수 있는 뉴스는 반드시 '상'으로 분류하세요.
+2. 중복 제거: 동일하거나 매우 유사한 사건을 다루는 뉴스가 여러 개라면, 가장 내용이 상세하고 신뢰할 수 있는 1개만 '상' 또는 '중'으로 남기고 나머지는 예외 없이 모두 '하'로 처리하세요. (제목의 단어 배치만 다른 어뷰징 기사들을 철저히 걸러내세요.)
 
 [응답 형식]
 반드시 아래 JSON 형식으로만 답변하세요.

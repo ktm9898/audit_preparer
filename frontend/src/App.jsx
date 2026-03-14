@@ -66,8 +66,8 @@ function App() {
   const [news, setNews] = useState([]);
   const [newsCount, setNewsCount] = useState(0);
   const [selectedPersona, setSelectedPersona] = useState(null);
+  const [selectedNews, setSelectedNews] = useState(null);
   const [minutesFiles, setMinutesFiles] = useState([]);
-  const [reportFiles, setReportFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [activeTab, setActiveTab] = useState('summary');
@@ -88,8 +88,6 @@ function App() {
 
       const mRes = await axios.get(`${API_BASE}?action=listFiles&type=minutes&token=${passcode}`);
       if (Array.isArray(mRes.data)) setMinutesFiles(mRes.data);
-      const rRes = await axios.get(`${API_BASE}?action=listFiles&type=report&token=${passcode}`);
-      if (Array.isArray(rRes.data)) setReportFiles(rRes.data);
       
       setStatus('');
     } catch (err) { 
@@ -214,7 +212,7 @@ function App() {
         if (result.ok) {
           setStatus('업로드 성공!');
           const res = await axios.get(`${API_BASE}?action=listFiles&type=${type}`);
-          if (type === 'minutes') setMinutesFiles(res.data); else setReportFiles(res.data);
+          if (type === 'minutes') setMinutesFiles(res.data);
         } else {
           throw new Error(result.error || '업로드 처리 중 서버 오류');
         }
@@ -252,7 +250,7 @@ function App() {
       if (result.ok) {
         setStatus('삭제 성공!');
         const res = await axios.get(`${API_BASE}?action=listFiles&type=${type}&token=${passcode}`);
-        if (type === 'minutes') setMinutesFiles(res.data); else setReportFiles(res.data);
+        if (type === 'minutes') setMinutesFiles(res.data);
       } else {
         throw new Error(result.error || '삭제 중 서버 오류');
       }
@@ -490,11 +488,10 @@ function App() {
                   <table className="premium-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '80px' }}>중요도</th>
-                        <th style={{ width: '100px' }}>날짜</th>
-                        <th style={{ width: '120px' }}>언론사</th>
-                        <th>뉴스 제목 및 요약</th>
-                        <th style={{ width: '80px' }}>링크</th>
+                        <th style={{ width: '80px' }}>상태</th>
+                        <th style={{ width: '250px' }}>기사</th>
+                        <th>요약</th>
+                        <th style={{ width: '100px' }}>원문</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -504,25 +501,28 @@ function App() {
                         </tr>
                       ) : (
                         news.map((item, idx) => (
-                          <tr key={idx} className="news-row">
+                          <tr key={idx} className="news-row clickable" onClick={() => setSelectedNews(item)}>
                             <td className="importance-cell">
                               <span className={`importance-badge ${item.중요도 === '상' ? 'high' : item.중요도 === '중' ? 'mid' : 'low'}`}>
                                 {item.중요도 || '하'}
                               </span>
                             </td>
-                            <td className="date-cell">{item.날짜 || "오늘"}</td>
-                            <td className="source-cell">
-                              <span className="source-badge">{item.언론사 || "뉴스"}</span>
+                            <td className="info-cell">
+                              <div className="news-title-mini">{item.제목 || item.title}</div>
+                              <div className="news-meta-mini">
+                                <span className="source">{item.언론사 || "뉴스"}</span>
+                                <span className="dot">·</span>
+                                <span className="date">{item.날짜 || "오늘"}</span>
+                              </div>
                             </td>
-                            <td className="content-cell">
-                              <div className="news-title-link">{item.제목 || item.title}</div>
+                            <td className="summary-cell">
                               <div className="news-summary-text">
-                                {item.AI요약 || item.aiSummary || item.naverDesc || "본문 내용을 확인해 주세요."}
+                                {item.AI요약 || item.aiSummary || item.naverDesc || "상세 내용을 확인해 주세요."}
                               </div>
                             </td>
                             <td className="action-cell">
-                              <a href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="icon-link-btn">
-                                <ExternalLink size={16} />
+                              <a href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="icon-link-btn" onClick={e => e.stopPropagation()}>
+                                <ArrowUpRight size={16} /> 원문
                               </a>
                             </td>
                           </tr>
@@ -621,7 +621,7 @@ function App() {
         </div>
       </main>
 
-      {/* 상세보기 모달 */}
+      {/* 의원 상세보기 모달 */}
       {selectedPersona && (
         <div className="modal-overlay fade-in" onClick={() => setSelectedPersona(null)}>
           <div className="detail-modal" onClick={e => e.stopPropagation()}>
@@ -639,6 +639,50 @@ function App() {
             </div>
             <div className="modal-footer">
               <button className="modal-confirm-btn" onClick={() => setSelectedPersona(null)}>확인</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 뉴스 상세 모달 */}
+      {selectedNews && (
+        <div className="modal-overlay fade-in" onClick={() => setSelectedNews(null)}>
+          <div className="detail-modal wide" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>기사 상세</h3>
+              <button className="close-btn" onClick={() => setSelectedNews(null)}><X size={20} /></button>
+            </div>
+            <div className="modal-body-scroll premium-scroll">
+              <div className="news-detail-container">
+                <div className="news-meta-row">
+                  <span className={`importance-badge ${selectedNews.중요도 === '상' ? 'high' : selectedNews.중요도 === '중' ? 'mid' : 'low'}`}>
+                    {selectedNews.중요도 || '하'}
+                  </span>
+                  <span className="source-tag">{selectedNews.언론사 || "뉴스"}</span>
+                  <span className="date-tag">{selectedNews.날짜}</span>
+                </div>
+                <h2 className="news-detail-title">{selectedNews.제목 || selectedNews.title}</h2>
+                <a href={selectedNews.링크 || selectedNews.link} target="_blank" rel="noopener noreferrer" className="source-link">
+                  <ArrowUpRight size={14} /> 원문 보기
+                </a>
+
+                <div className="news-section">
+                  <div className="section-label">AI 브리핑</div>
+                  <div className="ai-briefing-box">
+                    {selectedNews.AI요약 || selectedNews.aiSummary || selectedNews.naverDesc || "요약 정보가 없습니다."}
+                  </div>
+                </div>
+
+                <div className="news-section">
+                  <div className="section-label">기사 전문</div>
+                  <div className="full-text-box">
+                    {selectedNews.본문전문 || selectedNews.fullText || "본문 내용이 수집되지 않았습니다."}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-confirm-btn" onClick={() => setSelectedNews(null)}>닫기</button>
             </div>
           </div>
         </div>
@@ -1186,6 +1230,35 @@ function App() {
         .speech-summary-box { 
           font-size: 0.95rem; line-height: 1.8; color: #334155; white-space: pre-wrap;
           background: #fcfdfe; padding: 1.5rem; border-radius: 1rem; border: 1px solid #f1f5f9;
+        }
+
+        /* News UI Enhancements */
+        .news-row.clickable { cursor: pointer; transition: background 0.2s; }
+        .news-row.clickable:hover { background: #f8fafc; }
+        .news-title-mini { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
+        .news-meta-mini { font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem; font-weight: 600; }
+        .news-meta-mini .dot { color: var(--border); }
+        .summary-cell { max-width: 400px; }
+        .icon-link-btn { color: var(--primary); font-size: 0.8rem; font-weight: 600; text-decoration: none; display: flex; align-items: center; gap: 0.2rem; }
+        
+        .detail-modal.wide { max-width: 800px; }
+        .news-detail-container { padding: 2rem; }
+        .news-meta-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+        .source-tag { font-weight: 700; color: #475569; font-size: 0.9rem; }
+        .date-tag { color: #94a3b8; font-size: 0.85rem; font-weight: 500; }
+        .news-detail-title { font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.4; margin: 0; margin-bottom: 1rem; }
+        .source-link { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--primary); font-size: 0.9rem; font-weight: 700; text-decoration: none; margin-bottom: 2.5rem; border-bottom: 2px solid var(--primary-light); padding-bottom: 4px; }
+        .source-link:hover { color: #4338ca; border-color: var(--primary); }
+
+        .news-section { margin-bottom: 2.5rem; }
+        .section-label { font-size: 0.8rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; }
+        .ai-briefing-box { 
+          background: #f1f5f9; padding: 1.5rem; border-radius: 1rem; border: 1px solid #e2e8f0;
+          font-size: 1rem; line-height: 1.8; color: #1e293b; font-weight: 500;
+        }
+        .full-text-box { 
+          font-size: 0.95rem; line-height: 1.8; color: #334155; white-space: pre-wrap;
+          background: white; padding: 1.5rem; border-radius: 1rem; border: 1px solid #f1f5f9;
         }
       `}</style>
     </div>
