@@ -402,6 +402,8 @@ ${newsDataForAI}`;
 function deepAnalyzeNewsWithAI(newsList, apiKey) {
   if (!apiKey || newsList.length === 0) return newsList;
 
+  return newsList.map(item => {
+    let analyzeSource = "";
     if (!item.fullText || item.fullText.length < 100) {
       console.log(`기사 본문 부족(${item.fullText?.length || 0}자). 네이버 요약 기반 분석 진행: ${item.title}`);
       analyzeSource = item.naverDesc;
