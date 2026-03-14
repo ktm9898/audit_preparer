@@ -439,12 +439,6 @@ function App() {
                             </div>
                           </div>
                           
-                          <div className="summary-section">
-                            <label>상세 발언 요약</label>
-                            <div className="summary-text-box">
-                              {p.발언요약 || p.상세발언 || p["발언 요약"] || p["발언요약"] || "-"}
-                            </div>
-                          </div>
 
                           <div className="audit-section danger">
                             <label>핵심 감사 포인트</label>
@@ -453,7 +447,7 @@ function App() {
                         </div>
                         <div className="card-footer-action">
                           <button className="premium-more-btn" onClick={() => setSelectedPersona(p)}>
-                            상세 분석 리포트 <ArrowUpRight size={14} />
+                            주요 발언 요약 <ArrowUpRight size={14} />
                           </button>
                         </div>
                       </div>
@@ -632,15 +626,11 @@ function App() {
         <div className="modal-overlay fade-in" onClick={() => setSelectedPersona(null)}>
           <div className="detail-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{selectedPersona.의원명 || selectedPersona.이름} 의원 상세 발언 요약</h3>
+              <h3>{selectedPersona.의원명 || selectedPersona.이름} 의원 주요 발언 요약</h3>
               <button className="close-btn" onClick={() => setSelectedPersona(null)}><X size={20} /></button>
             </div>
             <div className="modal-body-scroll premium-scroll">
                 <div className="persona-detail-container">
-                  <div className="detail-meta">
-                    <div className="meta-badge">{selectedPersona.지역구 || "지역구 미확인"}</div>
-                    <h4>관련 회의록 발언 상세 기록</h4>
-                  </div>
                   <div className="speech-summary-box">
                     {selectedPersona.발언요약 || selectedPersona["발언 요약"] || selectedPersona["발언요약"] || 
                      selectedPersona.상세발언 || "발언 기록이 없습니다. 분석 파이프라인을 실행해 주세요."}

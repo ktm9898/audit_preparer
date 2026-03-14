@@ -271,7 +271,18 @@ ${newsDataForAI}`;
     
     if (resp.getResponseCode() === 200) {
       const resJson = JSON.parse(resp.getContentText());
-      const feedback = resJson.candidates[0].content.parts[0].text;
+      let feedback = resJson.candidates[0].content.parts[0].text.trim();
+      
+      // JSON 추출 안정화
+      if (feedback.startsWith('```')) {
+        feedback = feedback.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      }
+      const jsonStart = feedback.indexOf('{');
+      const jsonEnd = feedback.lastIndexOf('}') + 1;
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        feedback = feedback.substring(jsonStart, jsonEnd);
+      }
+      
       const parsed = JSON.parse(feedback);
       parsed.results.forEach(item => {
         if (newsList[item.index]) newsList[item.index].importance = item.importance;
@@ -313,7 +324,18 @@ ${item.fullText.substring(0, 5000)}
       
       if (resp.getResponseCode() === 200) {
         const resJson = JSON.parse(resp.getContentText());
-        const feedback = resJson.candidates[0].content.parts[0].text;
+        let feedback = resJson.candidates[0].content.parts[0].text.trim();
+        
+        // JSON 추출 안정화
+        if (feedback.startsWith('```')) {
+          feedback = feedback.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+        }
+        const jsonStart = feedback.indexOf('{');
+        const jsonEnd = feedback.lastIndexOf('}') + 1;
+        if (jsonStart !== -1 && jsonEnd !== -1) {
+          feedback = feedback.substring(jsonStart, jsonEnd);
+        }
+        
         const parsed = JSON.parse(feedback);
         item.aiSummary = parsed.summary;
         item.importance = parsed.importance;
@@ -355,11 +377,19 @@ ${context.substring(0, 30000)}`;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`;
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json" }
+      generationConfig: { response_mime_type: "application/json" }
     };
     const response = UrlFetchApp.fetch(url, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload) });
-    const indicesStr = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text;
-    const selectedIndices = typeof indicesStr === 'string' ? JSON.parse(indicesStr) : indicesStr;
+    const fullContent = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text;
+    
+    // JSON 추출 안정화
+    let cleanJson = fullContent;
+    const jsonStart = cleanJson.indexOf('[');
+    const jsonEnd = cleanJson.lastIndexOf(']') + 1;
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      cleanJson = cleanJson.substring(jsonStart, jsonEnd);
+    }
+    const selectedIndices = JSON.parse(cleanJson);
     
     return newsList.filter((_, i) => selectedIndices.includes(i));
   } catch (e) {
@@ -478,9 +508,9 @@ ${context}`;
       payload: JSON.stringify({ 
         contents: [userMessage], 
         generationConfig: { 
-          responseMimeType: "application/json",
+          response_mime_type: "application/json",
           temperature: 0.1, 
-          maxOutputTokens: 8192 
+          max_output_tokens: 8192 
         } 
       }) 
     });
@@ -488,14 +518,20 @@ ${context}`;
     const respObj = JSON.parse(response.getContentText());
     let rawText = respObj.candidates[0].content.parts[0].text;
     
-    // JSON 추출 안정화
-    const jsonStart = rawText.indexOf('{');
-    const jsonEnd = rawText.lastIndexOf('}') + 1;
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      rawText = rawText.substring(jsonStart, jsonEnd);
+    // JSON 추출 안정화 (더욱 강력하게)
+    let cleanJson = rawText.trim();
+    // 마크다운 블록 제거
+    if (cleanJson.startsWith('```')) {
+      cleanJson = cleanJson.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
     
-    const result = JSON.parse(rawText);
+    const jsonStart = cleanJson.indexOf('{');
+    const jsonEnd = cleanJson.lastIndexOf('}') + 1;
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      cleanJson = cleanJson.substring(jsonStart, jsonEnd);
+    }
+    
+    const result = JSON.parse(cleanJson);
     const now = Utilities.formatDate(new Date(), "GMT+9", "yyyy-MM-dd HH:mm");
     
     // 4. 시트 기록
