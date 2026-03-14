@@ -127,7 +127,12 @@ function isTrustedMedia(url) {
 }
 
 function getGeminiModel() {
-  return "gemini-3-flash-preview"; 
+  return "gemini-1.5-flash"; 
+}
+
+function normalizeTitle(title) {
+  if (!title) return "";
+  return title.toLowerCase().replace(/[^a-z0-9가-힣]/g, "").replace(/\s/g, "");
 }
 
 // --- 핵심 로직: 네이버 뉴스 수집 ---
@@ -167,107 +172,116 @@ function fetchNewsFromNaver() {
 
   if (allItems.length === 0) return { ok: false, error: "뉴스를 가져오지 못했습니다." };
 
-  // 2. 데이터 정제 및 월별 그룹화
-  const processedItems = allItems.map(item => {
-    const link = item.originallink || item.link;
-    const title = item.title.replace(/<[^>]+>/g, "");
-    const date = new Date(item.pubDate);
-    const dateStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM-dd");
-    const monthStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM");
-    return { ...item, cleanTitle: title, cleanLink: link, dateStr, monthStr };
-  });
-
-  // 중복 제거 (URL 기준)
-  const uniqueItems = [];
+  // 2. 데이터 정제 및 강력한 중복 제거
   const visitedLinks = new Set();
-  processedItems.forEach(item => {
-    if (!visitedLinks.has(item.cleanLink) && isTrustedMedia(item.cleanLink)) {
-      visitedLinks.add(item.cleanLink);
-      uniqueItems.push(item);
+  const visitedNormalizedTitles = new Set();
+  const processedItems = [];
+
+  allItems.forEach(item => {
+    const link = item.originallink || item.link;
+    const title = item.title.replace(/<[^>]+>/g, "").trim();
+    const normalized = normalizeTitle(title);
+    
+    if (!visitedLinks.has(link) && !visitedNormalizedTitles.has(normalized) && isTrustedMedia(link)) {
+      const date = new Date(item.pubDate);
+      const dateStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM-dd");
+      const monthStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM");
+      
+      visitedLinks.add(link);
+      visitedNormalizedTitles.add(normalized);
+      processedItems.push({ 
+        ...item, 
+        cleanTitle: title, 
+        cleanLink: link, 
+        dateStr, 
+        monthStr,
+        pubTimestamp: date.getTime()
+      });
     }
   });
 
-  // 월별로 그룹화
+  // 월별 그룹화 후 샘플링 (충분한 후보 확보를 위해 월 15개)
   const monthlyGroups = {};
-  uniqueItems.forEach(item => {
+  processedItems.forEach(item => {
     if (!monthlyGroups[item.monthStr]) monthlyGroups[item.monthStr] = [];
     monthlyGroups[item.monthStr].push(item);
   });
 
-  // 월별로 최대 15개씩 샘플링하여 총 120~150개 확보
-  const sampledItems = [];
+  const candidateItems = [];
   Object.keys(monthlyGroups).sort((a,b) => b.localeCompare(a)).forEach(month => {
     const monthItems = monthlyGroups[month]
-      .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate))
+      .sort((a, b) => b.pubTimestamp - a.pubTimestamp)
       .slice(0, 15);
-    sampledItems.push(...monthItems);
+    candidateItems.push(...monthItems);
   });
 
+  // --- 시트 준비 (헤더 제외 초기화) ---
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet(ss, '최근 뉴스');
   const headers = ['날짜', '주제', '언론사', '제목', '네이버요약', '본문전문', '링크', 'AI요약', '중요도'];
   
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(headers);
-  }
-  // 헤더가 다른 경우 초기화
-  if (sheet.getRange(1, 1).getValue() !== '날짜' || sheet.getLastColumn() < headers.length) {
-    sheet.clear().appendRow(headers);
-  }
-  const existingLinks = sheet.getLastRow() > 1 ? sheet.getRange("G:G").getValues().flat().map(String) : [];
-  const existingTitles = sheet.getLastRow() > 1 ? sheet.getRange("D:D").getValues().flat().map(String) : [];
-  
-  const newNews = sampledItems.filter(item => {
-                          return !existingLinks.includes(item.cleanLink) && !existingTitles.includes(item.cleanTitle);
-                        })
-                        .map(item => ({
-                          date: item.dateStr,
-                          topic: "서울신용보증재단",
-                          source: "뉴스",
-                          title: item.cleanTitle,
-                          naverDesc: item.description.replace(/<[^>]+>/g, ""),
-                          fullText: "", 
-                          link: item.cleanLink,
-                          aiSummary: "", 
-                          importance: "-"
-                        }))
-                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  sheet.clearContents(); // 전체 삭제
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]); // 헤더 다시 쓰기
 
-  if (newNews.length === 0) return { ok: true, message: "새로운 뉴스가 없습니다.", count: 0 };
+  const initialNewsList = candidateItems.map(item => ({
+    date: item.dateStr,
+    topic: "서울신용보증재단",
+    source: "뉴스",
+    title: item.cleanTitle,
+    naverDesc: item.description.replace(/<[^>]+>/g, "").trim(),
+    fullText: "", 
+    link: item.cleanLink,
+    aiSummary: "", 
+    importance: "-",
+    pubTimestamp: item.pubTimestamp
+  })).sort((a, b) => b.pubTimestamp - a.pubTimestamp);
 
-  // --- 3단계 AI 파이프라인 시작 ---
+  // --- AI 파이프라인 ---
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
 
-  // Stage 1: 스크리닝 (중복 제거 & 중요 뉴스 선별)
-  console.log("Stage 1 시작: 뉴스 선별 및 중복 제거...");
-  const screenedNews = screenImportanceWithAI(newNews, API_KEY);
-  const targetNewsList = screenedNews.filter(n => n.importance === '상' || n.importance === '중').slice(0, 30);
+  // Stage 1: 스크리닝 (AI 기반 중요도 판별)
+  console.log(`Stage 1 시작: 뉴스 ${initialNewsList.length}건 선별 중...`);
+  const screenedNews = screenImportanceWithAI(initialNewsList, API_KEY);
   
-  // Stage 2: 전문 크롤링 (선별된 기사만)
-  console.log(`Stage 2 시작: ${targetNewsList.length}건 전문 수집...`);
-  const crawledNews = crawlNewsContent(targetNewsList);
+  // 중요도 순 정렬 (상 > 중 > 하) + 최신순
+  const importanceMap = { '상': 3, '중': 2, '하': 1, '-': 0 };
+  const sortedNewsList = screenedNews.sort((a, b) => {
+    const impDiff = (importanceMap[b.importance] || 0) - (importanceMap[a.importance] || 0);
+    if (impDiff !== 0) return impDiff;
+    return b.pubTimestamp - a.pubTimestamp;
+  });
 
-  // Stage 3: 정밀 분석 (전문 기반 요약 및 최종 중요도 확정)
-  console.log("Stage 3 시작: 전문 정밀 분석 및 요약...");
-  const finalNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
+  // 정확히 Top 100 선별
+  const finalTop100 = sortedNewsList.slice(0, 100);
+  
+  // Stage 2 & 3: 상위 30건에 대해서만 전문 분석 수행 (비용 및 시간 효율화)
+  const top30 = finalTop100.slice(0, 30);
+  console.log(`Stage 2 & 3 시작: 상위 ${top30.length}건 정밀 분석 중...`);
+  const crawledNews = crawlNewsContent(top30);
+  const deepAnalyzedNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
+  
+  // 결과 합치기
+  const resultNews = [
+    ...deepAnalyzedNews,
+    ...finalTop100.slice(deepAnalyzedNews.length)
+  ];
 
-  if (finalNews.length > 0) {
-    const rows = finalNews.map(n => [
+  if (resultNews.length > 0) {
+    const rows = resultNews.map(n => [
       n.date, 
       n.topic, 
       n.source, 
       n.title, 
       n.naverDesc, 
-      n.fullText, 
+      n.fullText || "", 
       n.link, 
-      n.aiSummary || n.naverDesc, // AI 요약이 없으면 네이버 요약으로
+      n.aiSummary || n.naverDesc,
       n.importance
     ]);
-    sheet.insertRowsAfter(1, rows.length); // 헤더 아래에 새 행 삽입
     sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
   }
 
-  return { ok: true, count: finalNews.length };
+  return { ok: true, count: resultNews.length };
 }
 
 // --- 추가: 기사 본문 수집 함수 (crawlNewsContent) ---
@@ -300,7 +314,7 @@ function screenImportanceWithAI(newsList, apiKey) {
 
 [수행 작업]
 1. 중요도 판별: '서울신용보증재단', '소상공인 지원 정책', '상권 분석', '지방자치단체 업무보고'와의 연관성에 따라 '상', '중', '하'를 매기세요. 특히 재단에 대한 비판적이거나 리스크가 될 수 있는 뉴스는 반드시 '상'으로 분류하세요.
-2. 중복 제거: 동일하거나 매우 유사한 사건을 다루는 뉴스가 여러 개라면, 가장 내용이 상세하고 신뢰할 수 있는 1개만 '상' 또는 '중'으로 남기고 나머지는 예외 없이 모두 '하'로 처리하세요. (제목의 단어 배치만 다른 어뷰징 기사들을 철저히 걸러내세요.)
+2. 중복 및 유사 내용 제거: 동일하거나 유사한 사건을 다루는 뉴스가 여러 개라면, 가장 내용이 상세한 1개만 '상' 또는 '중'으로 남기고 나머지는 모두 '하'로 처리하세요. 제목만 조금 바꾼 중복 기사들을 매우 엄격하게 걸러내어 사용자에게 단 하나의 기사만 보여주도록 하세요.
 
 [응답 형식]
 반드시 아래 JSON 형식으로만 답변하세요.
