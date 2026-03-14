@@ -329,7 +329,7 @@ function crawlNewsContent(newsList) {
       console.log(`크롤링 시도: ${item.title}`);
       const options = {
         muteHttpExceptions: true,
-        timeoutSeconds: 20,
+        timeoutSeconds: 5, // [중요] 20초 -> 5초로 단축하여 전체 프로세스 생존 보장
         headers: { "User-Agent": userAgent }
       };
       const response = UrlFetchApp.fetch(item.link, options);
@@ -366,8 +366,8 @@ function screenImportanceWithAI(newsList, apiKey) {
 [지시사항]
 1. 중복 제거 (핵심): 동일하거나 매우 유사한 사건/이슈를 다루는 기사가 여러 개라면, 가장 포괄적인 1개만 살리고 나머지는 모두 중요도를 '하'로 매기세요. (사용자가 겹치는 뉴스를 보지 않게 하는 것이 최우선입니다.)
 2. 중요도 판별: 재단 관련 정책, 소상공인 지원, 경제 지표, 의회 행정감사 관련 기사를 '상', '중', '하'로 판별하세요.
-3. 분야 분류: '정책', '지원', '경제', '금융', '의회', '기타' 중 하나로 분류하세요.
-4. 반드시 '상' 또는 '중' 등급을 받은 기사 중 가장 우수한 15개를 선정하여 응답하세요.
+3. 분야 분류: 각 뉴스를 '정책', '지원', '경제', '금융', '의회', '기타' 중 하나로 분류하세요.
+4. 가용성 보장 (핵심): 만약 '상'이나 '중' 등급의 기사가 부족하더라도, 후보군 중 상대적으로 나은 기사들을 골라 **반드시 총 15개의 기사 인덱스를 응답**하세요. 절대로 15개 미만으로 응답하지 마세요.
 
 [응답 형식]
 반드시 JSON 형식으로만 답변하세요:
@@ -379,7 +379,7 @@ function screenImportanceWithAI(newsList, apiKey) {
 }
 
 [뉴스 후보 리스트]
-${newsDataForAI.substring(0, 50000)}`;
+${newsDataForAI.substring(0, 500000)}`; // [수정] 5만자 -> 50만자로 확장하여 1,000건 전수조사 실현
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
