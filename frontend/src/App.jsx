@@ -73,6 +73,14 @@ function App() {
   const [activeTab, setActiveTab] = useState('summary');
   const [passcode, setPasscode] = useState(localStorage.getItem('audit_passcode') || 'audit123');
   const [showSettings, setShowSettings] = useState(false);
+  const [filterMonth, setFilterMonth] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [targetCollectionMonth, setTargetCollectionMonth] = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${y}.${m}`;
+  });
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -141,13 +149,19 @@ function App() {
     }
   };
 
-  const fetchNews = async () => {
+  const fetchNews = async (month) => {
+    if (!month) {
+      alert('수집할 연월을 선택해 주세요.');
+      return;
+    }
     setLoading(true);
-    setStatus('최신 뉴스를 수집 및 검토 중입니다...');
+    setStatus(`${month} 뉴스를 수집 및 중복 검토 중입니다...`);
     try {
-      const res = await axios.get(`${API_BASE}?action=fetchNews&token=${passcode}`);
+      const res = await axios.get(`${API_BASE}?action=fetchNews&month=${month}&token=${passcode}`);
       if (res.data.ok) {
-        setStatus(`뉴스 수집 완료: ${res.data.count || 0}건의 주요 뉴스 추가`);
+        setStatus(res.data.count > 0 
+          ? `${month} 뉴스 수집 완료: ${res.data.count}건 추가` 
+          : `${month} 뉴스 수집 완료: 새로운 기사가 없습니다.`);
         await fetchInitialData();
       } else {
         throw new Error(res.data.error || '수집 실패');
@@ -473,12 +487,45 @@ function App() {
               <div className="section-header">
                 <div className="title-row">
                   <Newspaper size={24} className="title-icon" />
-                  <h2>수집 뉴스 아카이브</h2>
+                  <h2>뉴스 아카이브 (누적 관리)</h2>
                 </div>
-                <div className="btn-group">
-                  <button className="action-btn secondary" onClick={fetchNews}>
-                    <RefreshCw size={16} className={loading ? 'spin' : ''} /> 최신 뉴스 수집
+                <div className="collection-controls">
+                  <select 
+                    className="month-select" 
+                    value={targetCollectionMonth} 
+                    onChange={(e) => setTargetCollectionMonth(e.target.value)}
+                  >
+                    {Array.from({ length: 13 }, (_, i) => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() - i);
+                      const ym = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+                      return <option key={ym} value={ym}>{ym}</option>;
+                    })}
+                  </select>
+                  <button className="action-btn primary" onClick={() => fetchNews(targetCollectionMonth)}>
+                    <RefreshCw size={16} className={loading ? 'spin' : ''} /> 월별 뉴스 수집
                   </button>
+                </div>
+              </div>
+
+              <div className="archive-filter-bar premium-shadow">
+                <div className="filter-group">
+                  <label><Users size={14}/> 시점 필터</label>
+                  <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
+                    <option value="all">전체 기간</option>
+                    {[...new Set(news.map(n => n.날짜 || n.date))].sort().reverse().map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="search-group">
+                  <Search size={18} className="search-icon" />
+                  <input 
+                    type="text" 
+                    placeholder="제목, 내용, 카테고리 검색..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -494,12 +541,24 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {news.length === 0 ? (
+                      {news
+                        .filter(item => filterMonth === 'all' || (item.날짜 || item.date) === filterMonth)
+                        .filter(item => {
+                          const searchStr = (item.제목 || item.title || "") + (item.AI요약 || item.aiSummary || "") + (item.분야 || item.category || "");
+                          return searchStr.toLowerCase().includes(searchTerm.toLowerCase());
+                        })
+                        .length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="empty-row">수집된 뉴스가 없습니다. '최신 뉴스 수집' 버튼을 눌러주세요.</td>
+                          <td colSpan="5" className="empty-row">검색 조건에 맞는 뉴스가 없습니다.</td>
                         </tr>
                       ) : (
-                        news.map((item, idx) => (
+                        news
+                          .filter(item => filterMonth === 'all' || (item.날짜 || item.date) === filterMonth)
+                          .filter(item => {
+                            const searchStr = (item.제목 || item.title || "") + (item.AI요약 || item.aiSummary || "") + (item.분야 || item.category || "");
+                            return searchStr.toLowerCase().includes(searchTerm.toLowerCase());
+                          })
+                          .map((item, idx) => (
                           <tr key={idx} className="news-row clickable" onClick={() => setSelectedNews(item)}>
                             <td className="importance-cell">
                               <span className={`importance-badge ${item.중요도 === '상' ? 'high' : item.중요도 === '중' ? 'mid' : 'low'}`}>
@@ -512,7 +571,7 @@ function App() {
                               <div className="news-meta-mini">
                                 <span className="source">{item.언론사 || item.source || "뉴스"}</span>
                                 <span className="dot">·</span>
-                                <span className="date">{(item.날짜 || "").split(' ')[0] || "오늘"}</span>
+                                <span className="date">{(item.날짜 || item.date || "").split(' ')[0] || "오늘"}</span>
                               </div>
                             </td>
                             <td className="summary-cell">
@@ -521,9 +580,9 @@ function App() {
                               </div>
                             </td>
                             <td className="action-cell">
-                              <a href={item.링크 || item.link} target="_blank" rel="noopener noreferrer" className="icon-link-circle" onClick={e => e.stopPropagation()}>
+                              <button className="icon-link-circle" onClick={e => { e.stopPropagation(); window.open(item.링크 || item.link); }}>
                                 <ExternalLink size={16} />
-                              </a>
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -1131,6 +1190,25 @@ function App() {
         }
         .premium-news-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.05); border-color: var(--primary); }
         .news-badge { position: absolute; top: 1rem; right: 1rem; font-size: 0.65rem; font-weight: 800; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; color: var(--text-muted); }
+        
+        .archive-filter-bar {
+          background: white; border-radius: 1rem; padding: 1rem 1.5rem;
+          margin-bottom: 1.5rem; display: flex; gap: 2rem; align-items: center;
+          border: 1px solid var(--border);
+        }
+        .filter-group { display: flex; align-items: center; gap: 0.75rem; }
+        .filter-group label { font-size: 0.8rem; font-weight: 800; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem; }
+        .filter-group select { 
+          padding: 0.5rem 1rem; border-radius: 0.5rem; border: 1px solid var(--border);
+          font-weight: 600; font-size: 0.9rem; outline: none; background: #fcfdfe;
+        }
+        .search-group { flex: 1; display: flex; align-items: center; gap: 0.75rem; background: #f1f5f9; padding: 0.5rem 1rem; border-radius: 0.75rem; }
+        .search-icon { color: var(--text-muted); }
+        .search-group input { background: none; border: none; outline: none; width: 100%; font-size: 0.95rem; font-weight: 500; }
+        
+        .collection-controls { display: flex; gap: 0.5rem; align-items: center; }
+        .month-select { padding: 0.7rem 1rem; border-radius: 0.75rem; border: 1px solid var(--border); font-weight: 700; background: white; cursor: pointer; }
+
         .news-title { font-size: 1rem; font-weight: 700; line-height: 1.4; color: var(--text); padding-right: 3rem; margin: 0; }
         .news-desc { font-size: 0.85rem; color: var(--text-muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
         .news-meta { margin-top: auto; display: flex; justify-content: space-between; align-items: center; padding-top: 0.5rem; border-top: 1px solid #f8fafc; color: var(--primary); font-size: 0.75rem; font-weight: 600; }

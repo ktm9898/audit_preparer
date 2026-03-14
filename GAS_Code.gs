@@ -59,7 +59,8 @@ function doGet(e) {
     }
 
     if (action === 'fetchNews') {
-      return createResponse(fetchNewsFromNaver());
+      const targetMonth = e.parameter.month; // e.g. "2024.03"
+      return createResponse(fetchNewsFromNaver(targetMonth));
     }
 
     return createResponse({ error: 'Invalid GET action' });
@@ -136,7 +137,7 @@ function normalizeTitle(title) {
 }
 
 // --- 핵심 로직: 네이버 뉴스 수집 ---
-function fetchNewsFromNaver() {
+function fetchNewsFromNaver(targetMonth) {
   const CLIENT_ID = PROPS.getProperty('NAVER_CLIENT_ID');
   const CLIENT_SECRET = PROPS.getProperty('NAVER_CLIENT_SECRET');
   if (!CLIENT_ID || !CLIENT_SECRET) return { ok: false, error: "네이버 API 설정이 필요합니다." };
@@ -145,33 +146,38 @@ function fetchNewsFromNaver() {
   const allItems = [];
   const apiHeaders = { "X-Naver-Client-Id": CLIENT_ID, "X-Naver-Client-Secret": CLIENT_SECRET };
 
-  // 1. 월별 강제 분배 수집 (최근 12개월)
-  const now = new Date();
-  for (let i = 0; i < 12; i++) {
-    const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const yearMonth = Utilities.formatDate(targetDate, "GMT+9", "yyyy.MM");
-    const query = `${baseQuery} ${yearMonth}`;
-    
+  // 1. 기간 설정 및 수집
+  if (targetMonth) {
+    // 특정 월 수집 (예: "2024.03")
+    const query = `${baseQuery} ${targetMonth}`;
     try {
-      // 월별로 제목 유사도가 높은(sim) 뉴스 위주로 수집
-      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=50&start=1&sort=sim`;
-      const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
-      if (response.getResponseCode() === 200) {
-        const data = JSON.parse(response.getContentText());
-        if (data.items) allItems.push(...data.items);
-      }
-    } catch (e) { console.error(`Naver API Fetch Error (${yearMonth}): ${e.message}`); }
-  }
-
-  // 보험: 최신순(date)으로도 100개 추가 확보
-  try {
-    const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(baseQuery)}&display=100&start=1&sort=date`;
-    const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
-    if (response.getResponseCode() === 200) {
-      const data = JSON.parse(response.getContentText());
-      if (data.items) allItems.push(...data.items);
+      // 해당 월에 대해 sim(유사도) 및 date(최신순) 골고루 배치
+      ['sim', 'date'].forEach(sort => {
+        const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=100&start=1&sort=${sort}`;
+        const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
+        if (response.getResponseCode() === 200) {
+          const data = JSON.parse(response.getContentText());
+          if (data.items) allItems.push(...data.items);
+        }
+      });
+    } catch (e) { console.error(`Naver API Fetch Error (${targetMonth}): ${e.message}`); }
+  } else {
+    // 월 지정이 없으면 전체 흐름 (최근 12개월 루프)
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const yearMonth = Utilities.formatDate(targetDate, "GMT+9", "yyyy.MM");
+      const query = `${baseQuery} ${yearMonth}`;
+      try {
+        const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=50&start=1&sort=sim`;
+        const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
+        if (response.getResponseCode() === 200) {
+          const data = JSON.parse(response.getContentText());
+          if (data.items) allItems.push(...data.items);
+        }
+      } catch (e) {}
     }
-  } catch (e) {}
+  }
 
   if (allItems.length === 0) return { ok: false, error: "뉴스를 가져오지 못했습니다." };
 
@@ -179,78 +185,50 @@ function fetchNewsFromNaver() {
   const visitedLinks = new Set();
   const visitedNormalizedTitles = new Set();
   const processedItems = [];
+  
+  // (중요) 기존 시트 데이터 로드하여 중복 체크용 셋 만들기
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getOrCreateSheet(ss, '최근 뉴스');
+  const existingData = sheet.getDataRange().getValues();
+  const existingLinks = new Set(existingData.map(r => r[6])); // G열(링크) 기반
+  const existingTitles = new Set(existingData.map(r => normalizeTitle(r[3]))); // D열(제목) 기반
 
   allItems.forEach(item => {
     const link = item.originallink || item.link;
     const title = item.title.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim();
     const normalized = normalizeTitle(title);
     
-    if (!visitedLinks.has(link) && !visitedNormalizedTitles.has(normalized) && isTrustedMedia(link)) {
-      const date = new Date(item.pubDate);
-      const dateStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM-dd");
-      const monthStr = Utilities.formatDate(date, "GMT+9", "yyyy-MM");
+    // 이전에 수집한 적이 없고, 현재 루프에서도 처음인 경우만 통과
+    if (!existingLinks.has(link) && !existingTitles.has(normalized) && 
+        !visitedLinks.has(link) && !visitedNormalizedTitles.has(normalized) && 
+        isTrustedMedia(link)) {
       
-      // 언론사 이름 추출 개선 (Naver API는 description에 언론사가 섞여 나오기도 함. 여기서는 도메인 기반 추정 후 AI가 보강하도록 함)
+      const date = new Date(item.pubDate);
+      const monthStr = Utilities.formatDate(date, "GMT+9", "yyyy.MM");
+      
       let sourceName = "뉴스";
       try {
         const domain = link.split('/')[2].replace('www.', '').replace('m.', '');
-        if (domain.includes('chosun')) sourceName = "조선일보";
-        else if (domain.includes('joongang')) sourceName = "중앙일보";
-        else if (domain.includes('donga')) sourceName = "동아일보";
-        else if (domain.includes('yna') || domain.includes('yna.co.kr')) sourceName = "연합뉴스";
-        else if (domain.includes('newsis')) sourceName = "뉴시스";
-        else if (domain.includes('news1')) sourceName = "뉴스1";
-        else if (domain.includes('sedaily')) sourceName = "서울경제";
-        else if (domain.includes('edaily')) sourceName = "이데일리";
-        else if (domain.includes('hankyung')) sourceName = "한국경제";
-        else if (domain.includes('mk.co.kr')) sourceName = "매일경제";
-        else if (domain.includes('hani')) sourceName = "한겨레";
-        else if (domain.includes('khan')) sourceName = "경향신문";
-        else if (domain.includes('kbs')) sourceName = "KBS";
-        else if (domain.includes('mbc')) sourceName = "MBC";
-        else if (domain.includes('sbs')) sourceName = "SBS";
+        const domainMap = { 'chosun': '조선일보', 'joongang': '중앙일보', 'donga': '동아일보', 'yna': '연합뉴스', 'newsis': '뉴시스', 'news1': '뉴스1', 'sedaily': '서울경제', 'edaily': '이데일리', 'hankyung': '한국경제', 'mk.co.kr': '매일경제', 'hani': '한겨레', 'khan': '경향신문', 'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS' };
+        for (const keyInMap in domainMap) {
+          if (domain.includes(keyInMap)) { sourceName = domainMap[keyInMap]; break; }
+        }
       } catch(e) {}
 
       visitedLinks.add(link);
       visitedNormalizedTitles.add(normalized);
-      processedItems.push({ 
-        ...item, 
-        cleanTitle: title, 
-        cleanLink: link, 
-        sourceName,
-        dateStr, 
-        monthStr,
-        pubTimestamp: date.getTime()
-      });
+      processedItems.push({ ...item, cleanTitle: title, cleanLink: link, sourceName, monthStr, pubTimestamp: date.getTime() });
     }
   });
 
-  // 월별 루프 돌며 균등 배분 (각 월별 약 8~10건 목표)
-  const monthlyGroups = {};
-  processedItems.forEach(item => {
-    if (!monthlyGroups[item.monthStr]) monthlyGroups[item.monthStr] = [];
-    monthlyGroups[item.monthStr].push(item);
-  });
+  if (processedItems.length === 0) return { ok: true, count: 0, message: "새로운 뉴스 항목이 없습니다." };
 
-  const finalPool = [];
-  Object.keys(monthlyGroups).sort((a,b) => b.localeCompare(a)).forEach(month => {
-    const monthItems = monthlyGroups[month]
-      .sort((a, b) => b.pubTimestamp - a.pubTimestamp)
-      .slice(0, 10); // 월당 10개로 제한하여 12개월분 확보 시 100~120개
-    finalPool.push(...monthItems);
-  });
-
-  // --- 시트 준비 (헤더 제외 초기화) ---
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = getOrCreateSheet(ss, '최근 뉴스');
-  const headers = ['날짜', '분야', '언론사', '제목', '네이버요약', '본문전문', '링크', 'AI요약', '중요도'];
-  
-  sheet.clearContents();
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  // 3. 후보군 선별 (월별 수집 시에는 월당 제한을 넉넉히 둠)
+  const finalPool = processedItems.sort((a,b) => b.pubTimestamp - a.pubTimestamp).slice(0, 50);
 
   const initialNewsList = finalPool.map(item => ({
-    date: item.dateStr,
-    category: "일반", // 초기값
+    date: item.monthStr, // 이제 YYYY.MM 만 표시
+    category: "일반",
     source: item.sourceName,
     title: item.cleanTitle,
     naverDesc: item.description.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').trim(),
@@ -259,38 +237,18 @@ function fetchNewsFromNaver() {
     aiSummary: "", 
     importance: "-",
     pubTimestamp: item.pubTimestamp
-  })).sort((a, b) => b.pubTimestamp - a.pubTimestamp);
+  }));
 
-  // --- AI 파이프라인 ---
+  // AI 파이프라인
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
-
-  // Stage 1: 스크리닝 (AI 기반 중요도 및 분야 판별 + 중복 제거)
-  console.log(`Stage 1 시작: 뉴스 ${initialNewsList.length}건 선별 및 분류 중...`);
   const screenedNews = screenImportanceWithAI(initialNewsList, API_KEY);
   
-  // 중요도 순 정렬 (상 > 중 > 하) + 최신순
-  const importanceMap = { '상': 3, '중': 2, '하': 1, '-': 0 };
-  const sortedNewsList = screenedNews.sort((a, b) => {
-    const impDiff = (importanceMap[b.importance] || 0) - (importanceMap[a.importance] || 0);
-    if (impDiff !== 0) return impDiff;
-    return b.pubTimestamp - a.pubTimestamp;
-  });
+  // 전수 크롤링 시도 (Fail-fast 적용됨)
+  console.log(`새로운 뉴스 ${screenedNews.length}건 본문 추출 및 분석 중...`);
+  const crawledNews = crawlNewsContent(screenedNews);
+  const resultNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
 
-  // 정확히 Top 100 선별
-  const finalTop100 = sortedNewsList.slice(0, 100);
-  
-  // Stage 2 & 3: 상위 30건에 대해서만 전문 분석 수행
-  const top30 = finalTop100.slice(0, 30);
-  console.log(`Stage 2 & 3 시작: 상위 ${top30.length}건 본문 추출 및 정밀 분석 중...`);
-  const crawledNews = crawlNewsContent(top30);
-  const deepAnalyzedNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
-  
-  // 결과 합치기
-  const resultNews = [
-    ...deepAnalyzedNews,
-    ...finalTop100.slice(deepAnalyzedNews.length)
-  ];
-
+  // 4. 시트에 데이터 추가 (Append)
   if (resultNews.length > 0) {
     const rows = resultNews.map(n => [
       n.date, 
@@ -303,7 +261,7 @@ function fetchNewsFromNaver() {
       n.aiSummary || n.naverDesc,
       n.importance
     ]);
-    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   }
 
   return { ok: true, count: resultNews.length };
@@ -314,16 +272,15 @@ function crawlNewsContent(newsList) {
   const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   return newsList.map(item => {
     try {
-      const response = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, timeoutSeconds: 30 });
+      // Fail-fast: 15초 타임아웃 적용 및 오류 시 즉시 Skip
+      const response = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, timeoutSeconds: 15 });
       if (response.getResponseCode() === 200) {
         const html = response.getContentText();
         const extracted = extractTextWithAI(html, API_KEY, item.title, item.link);
-        if (extracted) {
-          item.fullText = extracted;
-        }
+        if (extracted) item.fullText = extracted;
       }
     } catch (e) {
-      console.warn(`기사 본문 수집 실패: ${item.link}, ${e.message}`);
+      console.warn(`Skip 기사: ${item.link}, 사유: ${e.message}`);
     }
     return item;
   });
