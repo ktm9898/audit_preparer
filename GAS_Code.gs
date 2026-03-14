@@ -250,11 +250,12 @@ function fetchNewsFromNaver(targetMonth) {
 
   if (processedItems.length === 0) return { ok: true, count: 0, message: "새로운 뉴스 항목이 없습니다." };
 
-  // 3. 후보군 선별 (월별 수집 시에는 월당 제한을 넉넉히 둠)
-  const finalPool = processedItems.sort((a,b) => b.pubTimestamp - a.pubTimestamp).slice(0, 50);
+  // 3. 후보군 선별 및 AI 스크리닝
+  // 최대 50건의 후보를 AI에게 전달하여 중요도 판별
+  const candidatePool = processedItems.sort((a,b) => b.pubTimestamp - a.pubTimestamp).slice(0, 50);
 
-  const initialNewsList = finalPool.map(item => ({
-    date: item.monthStr, // 이제 YYYY.MM 만 표시
+  const initialNewsList = candidatePool.map(item => ({
+    date: item.monthStr,
     category: "일반",
     source: item.sourceName,
     title: item.cleanTitle,
@@ -266,13 +267,27 @@ function fetchNewsFromNaver(targetMonth) {
     pubTimestamp: item.pubTimestamp
   }));
 
-  // AI 파이프라인
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
+  
+  // [Stage 1] 스크리닝: 중요도/분야 판별 및 1차 중복 배제
+  console.log(`후보 기사 ${initialNewsList.length}건 선별 중...`);
   const screenedNews = screenImportanceWithAI(initialNewsList, API_KEY);
   
-  // 전수 크롤링 시도 (Fail-fast 적용됨)
-  console.log(`새로운 뉴스 ${screenedNews.length}건 본문 추출 및 분석 중...`);
-  const crawledNews = crawlNewsContent(screenedNews);
+  // 중요도 순 정렬 (상 > 중 > 하) 및 Top 15 기사만 최종 선별
+  const importanceWeight = { '상': 3, '중': 2, '하': 1, '-': 0 };
+  const finalTop15 = screenedNews
+    .sort((a, b) => {
+      const wA = importanceWeight[a.importance] || 0;
+      const wB = importanceWeight[b.importance] || 0;
+      if (wA !== wB) return wB - wA;
+      return b.pubTimestamp - a.pubTimestamp;
+    })
+    .slice(0, 15);
+
+  console.log(`최종 정예 ${finalTop15.length}건에 대해 본문 추출 및 심층 분석 시작...`);
+
+  // [Stage 2 & 3] 정예 15건에 대해서만 전문 크롤링 및 분석 수행
+  const crawledNews = crawlNewsContent(finalTop15);
   const resultNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
 
   // 4. 시트에 데이터 추가 (Append)

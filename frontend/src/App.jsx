@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { 
-  FileText, Search, AlertTriangle, HelpCircle, 
+import {
+  FileText, Search, AlertTriangle, HelpCircle,
   Upload, RefreshCw, Database, Users, CheckCircle2,
   Menu, X, ChevronRight, LayoutDashboard, UserCheck, ShieldAlert, MessageSquare,
   Settings, ArrowUpRight, Trash2, Newspaper, ExternalLink, Star, User
@@ -20,8 +20,8 @@ const MiniFileManager = ({ files, type, label, onUpload, onDelete }) => (
         <span>{label} 보관함</span>
       </div>
       <label className="mf-add">
-        <Upload size={14}/> <span>파일 추가</span>
-        <input type="file" hidden onChange={e => onUpload(e, type)}/>
+        <Upload size={14} /> <span>파일 추가</span>
+        <input type="file" hidden onChange={e => onUpload(e, type)} />
       </label>
     </div>
     <div className="mf-list">
@@ -96,11 +96,11 @@ function App() {
 
       const mRes = await axios.get(`${API_BASE}?action=listFiles&type=minutes&token=${passcode}`);
       if (Array.isArray(mRes.data)) setMinutesFiles(mRes.data);
-      
+
       setStatus('');
-    } catch (err) { 
-      console.error('데이터 로드 오류:', err); 
-      setStatus('연결 확인 필요 (비밀번호나 주소를 확인해 주세요)'); 
+    } catch (err) {
+      console.error('데이터 로드 오류:', err);
+      setStatus('연결 확인 필요 (비밀번호나 주소를 확인해 주세요)');
     }
     setLoading(false);
   };
@@ -125,24 +125,24 @@ function App() {
       const response = await fetch(API_BASE, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ 
-          action: 'runAnalysis', 
-          task, 
+        body: JSON.stringify({
+          action: 'runAnalysis',
+          task,
           fileId,
-          token: passcode 
+          token: passcode
         })
       });
       const result = await response.json();
-      
+
       if (result.ok) {
         setStatus('분석 완료! 데이터를 새로고침합니다.');
         await fetchInitialData();
       } else {
         throw new Error(result.error || '분석 중 서버 오류');
       }
-    } catch (err) { 
+    } catch (err) {
       console.error('분석 요청 에러:', err);
-      setStatus(`요청 실패: ${err.message}`); 
+      setStatus(`요청 실패: ${err.message}`);
     } finally {
       setLoading(false);
       setTimeout(() => setStatus(''), 8000);
@@ -155,12 +155,12 @@ function App() {
       return;
     }
     setLoading(true);
-    setStatus(`${month} 뉴스를 수집 및 중복 검토 중입니다...`);
+    setStatus(`${month} 뉴스를 수집 중입니다...`);
     try {
       const res = await axios.get(`${API_BASE}?action=fetchNews&month=${month}&token=${passcode}`);
       if (res.data.ok) {
-        setStatus(res.data.count > 0 
-          ? `${month} 뉴스 수집 완료: ${res.data.count}건 추가` 
+        setStatus(res.data.count > 0
+          ? `${month} 뉴스 수집 완료: ${res.data.count}건 추가`
           : `${month} 뉴스 수집 완료: 새로운 기사가 없습니다.`);
         await fetchInitialData();
       } else {
@@ -184,21 +184,21 @@ function App() {
       alert(`파일이 너무 큽니다. 15MB 이하만 가능합니다.`);
       return;
     }
-    
+
     const mimeType = file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
-    setLoading(true); 
+    setLoading(true);
     setStatus(`'${file.name}' 업로드 중...`);
-    
+
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
       try {
         const base64 = reader.result.split(',')[1];
-        const payload = JSON.stringify({ 
+        const payload = JSON.stringify({
           action: 'uploadFile',
-          filename: file.name, 
-          mimeType: mimeType, 
-          base64: base64, 
+          filename: file.name,
+          mimeType: mimeType,
+          base64: base64,
           type: type,
           token: passcode
         });
@@ -230,13 +230,13 @@ function App() {
         } else {
           throw new Error(result.error || '업로드 처리 중 서버 오류');
         }
-      } catch (err) { 
+      } catch (err) {
         console.error('업로드 실패 원인:', err);
         let msg = err.message;
         if (msg === 'Failed to fetch') {
           msg = '연결 차단됨 (보통 여러 구글 계정 로그인 또는 브라우저 보안 때문). 시크릿 창에서 시도하거나 GAS의 [새 배포]를 다시 해주세요.';
         }
-        setStatus(`업로드 실패: ${msg}`); 
+        setStatus(`업로드 실패: ${msg}`);
       } finally {
         setLoading(false);
         setTimeout(() => setStatus(''), 8000);
@@ -253,7 +253,7 @@ function App() {
       const response = await fetch(API_BASE, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           action: 'deleteFile',
           fileId,
           token: passcode
@@ -297,7 +297,7 @@ function App() {
     <div className="audit-app">
       {/* 배경 장식 */}
       <div className="bg-decoration"></div>
-      
+
       {/* 설정 모달 */}
       {showSettings && (
         <div className="modal-overlay">
@@ -309,9 +309,9 @@ function App() {
             <div className="modal-body">
               <div className="form-group">
                 <label>GAS 보안 비밀번호 (ACCESS_TOKEN)</label>
-                <input 
-                  type="password" 
-                  value={passcode} 
+                <input
+                  type="password"
+                  value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
                   placeholder="GAS 스크립트 속성에 설정된 토큰 입력"
                 />
@@ -325,7 +325,7 @@ function App() {
           </div>
         </div>
       )}
-      
+
       {/* 네비게이션 */}
       <header className="main-header">
         <div className="header-container">
@@ -376,33 +376,33 @@ function App() {
                   새로고침
                 </button>
               </div>
-              
+
               <div className="stats-grid">
-                <StatCard 
-                  title="등록된 의원 관심사" 
-                  value={`${personas.length}명`} 
-                  icon={Users} 
+                <StatCard
+                  title="등록된 의원 관심사"
+                  value={`${personas.length}명`}
+                  icon={Users}
                   color="blue"
                   onClick={() => setActiveTab('personas')}
                 />
-                <StatCard 
-                  title="분석된 리스크 요인" 
-                  value={`${risks.length}건`} 
-                  icon={ShieldAlert} 
+                <StatCard
+                  title="분석된 리스크 요인"
+                  value={`${risks.length}건`}
+                  icon={ShieldAlert}
                   color="red"
                   onClick={() => setActiveTab('risks')}
                 />
-                <StatCard 
-                  title="수집된 관련 뉴스" 
-                  value={`${newsCount}건`} 
-                  icon={Newspaper} 
+                <StatCard
+                  title="수집된 관련 뉴스"
+                  value={`${newsCount}건`}
+                  icon={Newspaper}
                   color="green"
                   onClick={() => setActiveTab('risks')}
                 />
-                <StatCard 
-                  title="최종 대비 예상 질문" 
-                  value={`${questions.length}개`} 
-                  icon={HelpCircle} 
+                <StatCard
+                  title="최종 대비 예상 질문"
+                  value={`${questions.length}개`}
+                  icon={HelpCircle}
                   color="purple"
                   onClick={() => setActiveTab('questions')}
                 />
@@ -429,7 +429,7 @@ function App() {
                   <Search size={18} /> 분석 파이프라인 실행
                 </button>
               </div>
-              
+
               <div className="layout-with-sidebar">
                 <div className="main-content">
                   <div className="card-grid">
@@ -455,7 +455,7 @@ function App() {
                               <p>{p["질문 성향"] || p["성향"] || "-"}</p>
                             </div>
                           </div>
-                          
+
 
                           <div className="audit-section danger">
                             <label>핵심 감사 포인트</label>
@@ -470,11 +470,11 @@ function App() {
                   )}
                 </div>
                 <aside className="sidebar">
-                  <MiniFileManager 
-                    files={minutesFiles} 
-                    type="minutes" 
-                    label="시의회 회의록" 
-                    onUpload={handleFileUpload} 
+                  <MiniFileManager
+                    files={minutesFiles}
+                    type="minutes"
+                    label="시의회 회의록"
+                    onUpload={handleFileUpload}
                     onDelete={handleDeleteFile}
                   />
                 </aside>
@@ -487,12 +487,12 @@ function App() {
               <div className="section-header">
                 <div className="title-row">
                   <Newspaper size={24} className="title-icon" />
-                  <h2>뉴스 아카이브 (누적 관리)</h2>
+                  <h2>뉴스 아카이브</h2>
                 </div>
                 <div className="collection-controls">
-                  <select 
-                    className="month-select" 
-                    value={targetCollectionMonth} 
+                  <select
+                    className="month-select"
+                    value={targetCollectionMonth}
                     onChange={(e) => setTargetCollectionMonth(e.target.value)}
                   >
                     {Array.from({ length: 13 }, (_, i) => {
@@ -510,19 +510,19 @@ function App() {
 
               <div className="archive-filter-bar premium-shadow">
                 <div className="filter-group">
-                  <label><Users size={14}/> 시점 필터</label>
+                  <label><Users size={14} /> 시점 필터</label>
                   <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)}>
                     <option value="all">전체 기간</option>
-                    {[...new Set(news.map(n => n.날짜 || n.date))].sort().reverse().map(m => (
+                    {(news || []).length > 0 && [...new Set(news.map(n => n?.날짜 || n?.date))].filter(Boolean).sort().reverse().map(m => (
                       <option key={m} value={m}>{m}</option>
                     ))}
                   </select>
                 </div>
                 <div className="search-group">
                   <Search size={18} className="search-icon" />
-                  <input 
-                    type="text" 
-                    placeholder="제목, 내용, 카테고리 검색..." 
+                  <input
+                    type="text"
+                    placeholder="제목, 내용, 카테고리 검색..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -541,24 +541,22 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {news
-                        .filter(item => filterMonth === 'all' || (item.날짜 || item.date) === filterMonth)
-                        .filter(item => {
-                          const searchStr = (item.제목 || item.title || "") + (item.AI요약 || item.aiSummary || "") + (item.분야 || item.category || "");
-                          return searchStr.toLowerCase().includes(searchTerm.toLowerCase());
-                        })
-                        .length === 0 ? (
-                        <tr>
-                          <td colSpan="5" className="empty-row">검색 조건에 맞는 뉴스가 없습니다.</td>
-                        </tr>
-                      ) : (
-                        news
-                          .filter(item => filterMonth === 'all' || (item.날짜 || item.date) === filterMonth)
+                      {(() => {
+                        if (!news || news.length === 0) {
+                          return <tr><td colSpan="5" className="empty-row">수집된 뉴스가 없습니다. 연월을 선택해 수집을 시작하세요.</td></tr>;
+                        }
+                        const filteredNews = news
+                          .filter(item => item && (filterMonth === 'all' || (item.날짜 || item.date) === filterMonth))
                           .filter(item => {
                             const searchStr = (item.제목 || item.title || "") + (item.AI요약 || item.aiSummary || "") + (item.분야 || item.category || "");
                             return searchStr.toLowerCase().includes(searchTerm.toLowerCase());
-                          })
-                          .map((item, idx) => (
+                          });
+
+                        if (filteredNews.length === 0) {
+                          return <tr><td colSpan="5" className="empty-row">검색 조건에 맞는 뉴스가 없습니다.</td></tr>;
+                        }
+
+                        return filteredNews.map((item, idx) => (
                           <tr key={idx} className="news-row clickable" onClick={() => setSelectedNews(item)}>
                             <td className="importance-cell">
                               <span className={`importance-badge ${item.중요도 === '상' ? 'high' : item.중요도 === '중' ? 'mid' : 'low'}`}>
@@ -585,8 +583,8 @@ function App() {
                               </button>
                             </td>
                           </tr>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -647,7 +645,7 @@ function App() {
                     <div className="step-num">Step 2</div>
                     <h3>최종 예상 질문 및 대응 가이드 ({questions.length}개)</h3>
                   </div>
-                  
+
                   <div className="questions-grid">
                     {questions.length === 0 ? (
                       <div className="empty-state-card">
@@ -657,7 +655,7 @@ function App() {
                     ) : (
                       questions.map((q, i) => (
                         <div key={i} className="premium-question-card">
-                          <div className="q-badge">예상 질문 {i+1}</div>
+                          <div className="q-badge">예상 질문 {i + 1}</div>
                           <div className="q-content">
                             <h4 className="question-text">{q["예상 질문"] || q["질문"]}</h4>
                             <div className="answer-section">
@@ -689,12 +687,12 @@ function App() {
               <button className="close-btn" onClick={() => setSelectedPersona(null)}><X size={20} /></button>
             </div>
             <div className="modal-body-scroll premium-scroll">
-                <div className="persona-detail-container">
-                  <div className="speech-summary-box">
-                    {selectedPersona.발언요약 || selectedPersona["발언 요약"] || selectedPersona["발언요약"] || 
-                     selectedPersona.상세발언 || "발언 기록이 없습니다. 분석 파이프라인을 실행해 주세요."}
-                  </div>
+              <div className="persona-detail-container">
+                <div className="speech-summary-box">
+                  {selectedPersona.발언요약 || selectedPersona["발언 요약"] || selectedPersona["발언요약"] ||
+                    selectedPersona.상세발언 || "발언 기록이 없습니다. 분석 파이프라인을 실행해 주세요."}
                 </div>
+              </div>
             </div>
             <div className="modal-footer">
               <button className="modal-confirm-btn" onClick={() => setSelectedPersona(null)}>확인</button>
