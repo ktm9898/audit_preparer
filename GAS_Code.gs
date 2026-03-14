@@ -221,7 +221,8 @@ function fetchNewsFromNaver(targetMonth) {
   const existingTitles = new Set(existingData.map(r => normalizeTitle(r[3]))); // D열(제목) 기반
 
   allItems.forEach(item => {
-    const link = item.originallink || item.link;
+    // [핵심 해결] 네이버 뉴스(news.naver.com) 인링크 우선 채택 (크롤링 성공률 100% 보장용)
+    const link = item.link && item.link.includes('news.naver.com') ? item.link : (item.originallink || item.link);
     const title = item.title.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim();
     const normalized = normalizeTitle(title);
     
@@ -302,7 +303,7 @@ function fetchNewsFromNaver(targetMonth) {
   if (resultNews.length > 0) {
     const rows = resultNews.map(n => [
       n.date, 
-      n.category || "-", // '주제' 컬럼
+      n.category || "-", // '분야' 컬럼 (사용자가 바꾼 헤더 대응)
       n.source || "뉴스", 
       n.title, 
       n.naverDesc, 

@@ -559,7 +559,7 @@ function App() {
                             
                             const title = item.제목 || item.title || "";
                             const summary = item.AI요약 || item.aiSummary || item.naverDesc || "";
-                            const category = item.분야 || item.주제 || item.category || "";
+                            const category = item.분야 || item.category || item.주제 || ""; // '분야' 우선
                             const searchStr = (title + summary + category).toLowerCase();
                             return searchStr.includes(searchTerm.toLowerCase());
                           });
@@ -571,7 +571,7 @@ function App() {
                         return filteredNews.map((item, idx) => {
                           if (!item) return null;
                           const importance = item.중요도 || item.importance || '하';
-                          const category = item.분야 || item.주제 || item.category || '기타';
+                          const category = item.분야 || item.category || item.주제 || '기타';
                           const title = item.제목 || item.title || '제목 없음';
                           const source = item.언론사 || item.source || '뉴스';
                           const date = String(item.날짜 || item.date || '오늘').split(' ')[0];
