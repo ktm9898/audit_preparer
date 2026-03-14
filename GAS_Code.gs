@@ -268,11 +268,16 @@ function fetchNewsFromNaver(targetMonth) {
 
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
   
-  // [Stage 1] 스크리닝: 중요도/분야 판별 및 1차 중복 배제
-  console.log(`후보 기사 ${initialNewsList.length}건 선별 중...`);
-  const screenedNews = screenImportanceWithAI(initialNewsList, API_KEY);
+  // [Stage 1] 스크리닝: 대량 후보군에서 15건 선발
+  console.log(`[스크리닝 시작] 총 ${initialNewsList.length}건 후보를 Gemini에게 전달합니다...`);
+  let screenedNews = screenImportanceWithAI(initialNewsList, API_KEY);
   
-  // 중요도 순 정렬 (상 > 중 > 하) 및 Top 15 기사만 최종 선별
+  if (!screenedNews || screenedNews.length === 0) {
+    console.warn("[경고] AI 스크리닝 결과가 비어 있습니다. 기본 15건으로 강제 진행합니다.");
+    screenedNews = initialNewsList.slice(0, 15);
+  }
+
+  // 중요도 가중치 설정
   const importanceWeight = { '상': 3, '중': 2, '하': 1, '-': 0 };
   const finalTop15 = screenedNews
     .sort((a, b) => {
@@ -283,28 +288,43 @@ function fetchNewsFromNaver(targetMonth) {
     })
     .slice(0, 15);
 
-  // [Stage 2 & 3] 정예 15건에 대해서만 전문 크롤링 및 분석 수행
-  const crawledNews = crawlNewsContent(finalTop15);
-  // 분석 전, 스크리닝에서 얻은 중요도와 카테고리를 백업 (분석 실패 시 대비)
-  const resultNews = deepAnalyzeNewsWithAI(crawledNews, API_KEY);
+  console.log(`[정예 선별 완료] ${finalTop15.length}건의 개별 분석 및 실시간 저장을 시작합니다.`);
 
-  // 4. 시트에 데이터 추가 (Append)
-  if (resultNews.length > 0) {
-    const rows = resultNews.map(n => [
-      n.date, 
-      n.category || "-", // '분야' 컬럼 (사용자가 바꾼 헤더 대응)
-      n.source || "뉴스", 
-      n.title, 
-      n.naverDesc, 
-      n.fullText || "", 
-      n.link, 
-      n.aiSummary || n.naverDesc,
-      n.importance || "-"
-    ]);
-    sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  // [Stage 2, 3, 4] 정예 15건 실시간 크롤링, 분석 및 저장
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getOrCreateSheet(ss, '최근 뉴스');
+  let successCount = 0;
+  
+  const startTime = new Date().getTime();
+  const TIME_LIMIT_MS = 300000; // 5분 안전 종료
+
+  for (let i = 0; i < finalTop15.length; i++) {
+    if (new Date().getTime() - startTime > TIME_LIMIT_MS) {
+      console.warn(`[타임아웃 임박] ${i}건 후 안전 종료합니다.`);
+      break;
+    }
+
+    let item = finalTop15[i];
+    try {
+      console.log(`[기사 처리 ${i+1}/${finalTop15.length}] ${item.title}`);
+      const crawled = crawlNewsContent([item])[0];
+      const analyzed = deepAnalyzeNewsWithAI([crawled], API_KEY)[0];
+      
+      if (analyzed) {
+        sheet.appendRow([
+          analyzed.date, analyzed.category || "-", analyzed.source || "뉴스", 
+          analyzed.title, analyzed.naverDesc, analyzed.fullText || "", 
+          analyzed.link, analyzed.aiSummary || analyzed.naverDesc, analyzed.importance || "-"
+        ]);
+        successCount++;
+      }
+    } catch (e) {
+      console.error(`처리 실패: ${item.title}, ${e.message}`);
+    }
   }
 
-  return { ok: true, count: resultNews.length };
+  console.log(`[수집 종료] 총 ${successCount}건 저장 완료.`);
+  return { ok: true, count: successCount };
 }
 
 // --- 불필요한 보정 로직 삭제 (사용자 요청 반영) ---
