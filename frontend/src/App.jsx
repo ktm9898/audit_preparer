@@ -580,10 +580,12 @@ function App() {
                           return (
                             <tr key={idx} className="news-row clickable" onClick={() => setSelectedNews(item)}>
                               <td className="importance-cell">
-                                <span className={`importance-badge ${importance === '상' ? 'high' : importance === '중' ? 'mid' : 'low'}`}>
-                                  {importance}
-                                </span>
-                                <div className="category-label">#{category}</div>
+                                <div className="status-impact-box">
+                                  <div className={`impact-indicator ${importance === '상' ? 'high' : importance === '중' ? 'mid' : 'low'}`}>
+                                    <span className="impact-text">{importance}</span>
+                                  </div>
+                                  <div className="field-tag">{category}</div>
+                                </div>
                               </td>
                               <td className="info-cell">
                                 <div className="news-title-premium">{title}</div>
@@ -1303,7 +1305,24 @@ function App() {
         .news-title-premium { font-size: 1rem; font-weight: 800; color: #1e293b; margin-bottom: 0.4rem; line-height: 1.4; letter-spacing: -0.01em; }
         .news-summary-text { 
            font-size: 0.9rem; color: #475569; line-height: 1.6;
-           display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+           display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        
+        .status-impact-box {
+          display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+        }
+        .impact-indicator {
+          width: 2.2rem; height: 2.2rem; border-radius: 0.6rem;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: 900; font-size: 0.9rem;
+        }
+        .impact-indicator.high { background: #fff1f2; color: #e11d48; border: 1.5px solid #fecdd3; }
+        .impact-indicator.mid { background: #ecfdf5; color: #059669; border: 1.5px solid #a7f3d0; }
+        .impact-indicator.low { background: #f8fafc; color: #64748b; border: 1.5px solid #e2e8f0; }
+        .field-tag {
+          font-size: 0.7rem; font-weight: 800; color: var(--text-muted);
+          background: #f1f5f9; padding: 2px 8px; border-radius: 4px;
+          white-space: nowrap; max-width: 70px; overflow: hidden; text-overflow: ellipsis;
         }
         .icon-link-circle {
           display: flex; align-items: center; justify-content: center;

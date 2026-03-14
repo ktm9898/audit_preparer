@@ -223,7 +223,9 @@ function fetchNewsFromNaver(targetMonth) {
       
       let sourceName = "뉴스";
       try {
-        const domain = link.split('/')[2].replace('www.', '').replace('m.', '');
+        // [수정] 도메인 추출 시 네이버 인링크(`link`)가 아닌 원본 링크(`originallink`)를 사용하여 원래 언론사명을 찾음
+        const sourceUrl = item.originallink || link;
+        const domain = sourceUrl.split('/')[2].replace('www.', '').replace('m.', '');
         const domainMap = { 
           'chosun': '조선일보', 'joongang': '중앙일보', 'donga': '동아일보', 'yna': '연합뉴스', 
           'newsis': '뉴시스', 'news1': '뉴스1', 'sedaily': '서울경제', 'edaily': '이데일리', 
@@ -231,7 +233,7 @@ function fetchNewsFromNaver(targetMonth) {
           'kmib': '국민일보', 'segye': '세계일보', 'seoul.co.kr': '서울신문', 'munhwa': '문화일보', 
           'moneytoday': '머니투데이', 'mt.co.kr': '머니투데이', 'asiae': '아시아경제', 'ajunews': '아주경제',
           'fnnews': '파이낸셜뉴스', 'heraldcorp': '헤럴드경제', 'etnews': '전자신문', 'digitaltimes': '디지털타임스',
-          'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS', 'ytn': 'YTN', 'naver': '네이버뉴스'
+          'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS', 'ytn': 'YTN'
         };
         for (const keyInMap in domainMap) {
           if (domain.includes(keyInMap)) { sourceName = domainMap[keyInMap]; break; }
