@@ -424,7 +424,12 @@ function App() {
                     {personas.map((p, i) => (
                       <div key={i} className="content-card persona">
                         <div className="card-top">
-                          <span className="name">{p.의원명 || p.이름} 의원</span>
+                          <div className="name-box">
+                            <span className="name">{p.의원명 || p.이름} 의원</span>
+                            <button className="compact-more-btn" onClick={() => setSelectedPersona(p)} title="주요 발언 보기">
+                              주요 발언 <ArrowUpRight size={12} />
+                            </button>
+                          </div>
                           <span className="party-badge">{p.지역구 || p.소속 || "지역구 미확인"}</span>
                         </div>
                         <div className="card-body">
@@ -444,11 +449,6 @@ function App() {
                             <label>핵심 감사 포인트</label>
                             <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || "-"}</p>
                           </div>
-                        </div>
-                        <div className="card-footer-action">
-                          <button className="premium-more-btn" onClick={() => setSelectedPersona(p)}>
-                            주요 발언 요약 <ArrowUpRight size={14} />
-                          </button>
                         </div>
                       </div>
                     ))}
@@ -626,7 +626,7 @@ function App() {
         <div className="modal-overlay fade-in" onClick={() => setSelectedPersona(null)}>
           <div className="detail-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{selectedPersona.의원명 || selectedPersona.이름} 의원 주요 발언 요약</h3>
+              <h3>{selectedPersona.의원명 || selectedPersona.이름} 의원 주요 발언</h3>
               <button className="close-btn" onClick={() => setSelectedPersona(null)}><X size={20} /></button>
             </div>
             <div className="modal-body-scroll premium-scroll">
@@ -1052,15 +1052,15 @@ function App() {
           color: #334155; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden;
         }
 
-        .card-footer-action { padding: 0.4rem 0.75rem 0.8rem; display: flex; justify-content: flex-end; }
-        .premium-more-btn {
-          background: var(--primary); color: white; border: none;
-          font-size: 0.8rem; font-weight: 600; padding: 0.5rem 0.9rem;
-          display: flex; align-items: center; gap: 0.4rem; cursor: pointer;
-          border-radius: 6px; transition: all 0.2s;
-          box-shadow: 0 2px 5px rgba(79, 70, 229, 0.2);
+        .card-footer-action { display: none; }
+        .name-box { display: flex; align-items: center; gap: 0.75rem; }
+        .compact-more-btn {
+          background: var(--primary-light); color: var(--primary); border: none;
+          font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.6rem;
+          display: flex; align-items: center; gap: 0.25rem; cursor: pointer;
+          border-radius: 4px; transition: all 0.2s;
         }
-        .premium-more-btn:hover { background: #4338ca; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3); }
+        .compact-more-btn:hover { background: var(--primary); color: white; transform: translateY(-1px); }
 
         /* Risks Layout */
         .risks-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; margin-top: 1rem; }
