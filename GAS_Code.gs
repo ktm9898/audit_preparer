@@ -116,7 +116,8 @@ const TRUSTED_DOMAINS = [
   'seoul.co.kr', 'segye.com', 'hankookilbo.com', 'kmib.co.kr', 'munhwa.com',
   'yna.co.kr', 'newsis.com', 'news1.kr',
   'kbs.co.kr', 'mbc.co.kr', 'sbs.co.kr', 'jtbc.co.kr', 'ytn.co.kr', 'mbn.co.kr', 'tvchosun.com', 'ichannela.com',
-  'hankyung.com', 'mk.co.kr', 'mt.co.kr', 'edaily.co.kr', 'sedaily.com', 'fnnews.com', 'heraldcorp.com', 'asiae.co.kr', 'ajunews.com'
+  'hankyung.com', 'mk.co.kr', 'mt.co.kr', 'edaily.co.kr', 'sedaily.com', 'fnnews.com', 'heraldcorp.com', 'asiae.co.kr', 'ajunews.com',
+  'naver.com'
 ];
 
 function isTrustedMedia(url) {
@@ -128,7 +129,7 @@ function isTrustedMedia(url) {
 }
 
 function getGeminiModel() {
-  return "gemini-1.5-flash"; 
+  return "gemini-3-flash-preview"; 
 }
 
 function normalizeTitle(title) {
@@ -208,29 +209,15 @@ function fetchNewsFromNaver(targetMonth) {
 
   if (allItems.length === 0) return { ok: false, error: "뉴스를 가져오지 못했습니다." };
 
-  // 2. 데이터 정제 및 강력한 중복 제거
-  const visitedLinks = new Set();
-  const visitedNormalizedTitles = new Set();
+  // 2. 데이터 정제 및 후보군 확보 (시트 대조 생략 - AI가 직접 중복 제거 수행)
   const processedItems = [];
   
-  // (중요) 기존 시트 데이터 로드하여 중복 체크용 셋 만들기
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = getOrCreateSheet(ss, '최근 뉴스');
-  const existingData = sheet.getDataRange().getValues();
-  const existingLinks = new Set(existingData.map(r => r[6])); // G열(링크) 기반
-  const existingTitles = new Set(existingData.map(r => normalizeTitle(r[3]))); // D열(제목) 기반
-
   allItems.forEach(item => {
-    // [핵심 해결] 네이버 뉴스(news.naver.com) 인링크 우선 채택 (크롤링 성공률 100% 보장용)
+    // [핵심] 네이버 뉴스(news.naver.com) 인링크 우선 채택 (크롤링 성공률 100% 보장용)
     const link = item.link && item.link.includes('news.naver.com') ? item.link : (item.originallink || item.link);
     const title = item.title.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&apos;/g, "'").trim();
-    const normalized = normalizeTitle(title);
     
-    // 이전에 수집한 적이 없고, 현재 루프에서도 처음인 경우만 통과
-    if (!existingLinks.has(link) && !existingTitles.has(normalized) && 
-        !visitedLinks.has(link) && !visitedNormalizedTitles.has(normalized) && 
-        isTrustedMedia(link)) {
-      
+    if (isTrustedMedia(link)) {
       const date = new Date(item.pubDate);
       const monthStr = Utilities.formatDate(date, "GMT+9", "yyyy.MM");
       
@@ -244,27 +231,29 @@ function fetchNewsFromNaver(targetMonth) {
           'kmib': '국민일보', 'segye': '세계일보', 'seoul.co.kr': '서울신문', 'munhwa': '문화일보', 
           'moneytoday': '머니투데이', 'mt.co.kr': '머니투데이', 'asiae': '아시아경제', 'ajunews': '아주경제',
           'fnnews': '파이낸셜뉴스', 'heraldcorp': '헤럴드경제', 'etnews': '전자신문', 'digitaltimes': '디지털타임스',
-          'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS', 'ytn': 'YTN'
+          'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS', 'ytn': 'YTN', 'naver': '네이버뉴스'
         };
         for (const keyInMap in domainMap) {
           if (domain.includes(keyInMap)) { sourceName = domainMap[keyInMap]; break; }
         }
-        if (sourceName === "뉴스") sourceName = domain.split('.')[0].toUpperCase(); 
       } catch(e) {}
 
-      visitedLinks.add(link);
-      visitedNormalizedTitles.add(normalized);
-      processedItems.push({ ...item, cleanTitle: title, cleanLink: link, sourceName, monthStr, pubTimestamp: date.getTime() });
+      processedItems.push({ 
+        ...item, 
+        cleanTitle: title, 
+        cleanLink: link, 
+        sourceName, 
+        monthStr, 
+        pubTimestamp: date.getTime() 
+      });
     }
   });
 
-  if (processedItems.length === 0) return { ok: true, count: 0, message: "새로운 뉴스 항목이 없습니다." };
+  if (processedItems.length === 0) return { ok: true, count: 0, message: "수집된 뉴스가 없습니다." };
 
-  // 3. 후보군 선별 및 AI 스크리닝
-  // 최대 50건의 후보를 AI에게 전달하여 중요도 판별
-  const candidatePool = processedItems.sort((a,b) => b.pubTimestamp - a.pubTimestamp).slice(0, 50);
-
-  const initialNewsList = candidatePool.map(item => ({
+  // 3. AI 지능형 선별 (AI Call 1: Screening & Dedup)
+  // 1,000건의 후보를 AI에게 전달하여 중복을 제거하고 정예 15건을 선발
+  const initialNewsList = processedItems.map(item => ({
     date: item.monthStr,
     category: "-", 
     source: item.sourceName || "뉴스",
@@ -318,24 +307,7 @@ function fetchNewsFromNaver(targetMonth) {
   return { ok: true, count: resultNews.length };
 }
 
-// --- 데이터 정규화 정적 함수 ---
-function normalizeImportance(val) {
-  if (!val) return "하";
-  const s = String(val).toLowerCase();
-  if (s.includes('상') || s.includes('high') || s.includes('top')) return "상";
-  if (s.includes('중') || s.includes('mid') || s.includes('medium')) return "중";
-  return "하";
-}
-
-function normalizeCategory(val) {
-  if (!val) return "기타";
-  const s = String(val);
-  const categories = ["정책", "지원", "경제", "금융", "의회", "기타"];
-  for (const cat of categories) {
-    if (s.includes(cat)) return cat;
-  }
-  return "기타";
-}
+// --- 불필요한 보정 로직 삭제 (사용자 요청 반영) ---
 
 function cleanTextForAI(text) {
   if (!text) return "";
@@ -361,12 +333,10 @@ function crawlNewsContent(newsList) {
         headers: { "User-Agent": userAgent }
       };
       const response = UrlFetchApp.fetch(item.link, options);
-      if (response.getResponseCode() === 200) {
         let html = response.getContentText();
-        // 본문 점유율을 높이기 위해 불필요한 태그 선제거
-        html = html.replace(/<(script|style|nav|header|footer|iframe|svg)[^>]*>([\s\S]*?)<\/\1>/gi, '');
-        html = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); // 텍스트만 남기거나 태그 최소화
-        
+        // 본문 점유율을 높이기 위해 불필요한 태그 제거 (구조는 최소한 유지)
+        html = html.replace(/<(script|style|nav|header|footer|iframe|svg|aside)[^>]*>([\s\S]*?)<\/\1>/gi, '');
+        // <p>, <div> 태그 등은 보존하여 AI가 본문 구조를 파악할 수 있게 함
         const extracted = extractTextWithAI(html, API_KEY, item.title, item.link);
         if (extracted) {
           item.fullText = extracted;
@@ -389,26 +359,26 @@ function screenImportanceWithAI(newsList, apiKey) {
   if (!apiKey || newsList.length === 0) return newsList;
 
   const newsDataForAI = newsList.map((n, i) => `[${i}] 제목: ${n.title}\n요약: ${n.naverDesc}`).join('\n---\n');
-  const prompt = `당신은 업무 효율을 극대화하는 지능형 뉴스 에디터입니다.
-아래 뉴스 리스트를 분석하여 3가지 작업을 수행하세요.
+  const prompt = `당신은 대한민국 최고의 뉴스 큐레이션 전문가입니다.
+제공된 뉴스 후보군(${newsList.length}건)에서 가장 가치 있는 15건을 선발하세요.
 
-[수행 작업]
-1. 중요도 판별: '서울신용보증재단', '소상공인 지원정책', '금융지원', '상권분석', '의회/행정감사'와의 연관성에 따라 '상', '중', '하'를 매기세요. 재단에 대한 비판적이거나 이슈가 될 만한 뉴스는 반드시 '상'으로 분류하세요.
-2. 분야 분류: 각 뉴스를 '정책', '지원', '경제', '금융', '의회', '기타' 중 하나로 분류하세요.
-3. 중복 및 유사 내용 제거: 동일하거나 사실상 같은 사건을 다루는 뉴스가 여러 개라면, 가장 내용이 상세한 1개만 '상' 또는 '중'으로 남기고 나머지는 모두 '하'로 처리하세요. 제목만 조금 바꾼 어뷰징 기사들을 매우 엄격하게 걸러내어 사용자에게 단 하나의 기사만 보여주도록 하세요.
+[지시사항]
+1. 중복 제거 (핵심): 동일하거나 매우 유사한 사건/이슈를 다루는 기사가 여러 개라면, 가장 포괄적인 1개만 살리고 나머지는 모두 중요도를 '하'로 매기세요. (사용자가 겹치는 뉴스를 보지 않게 하는 것이 최우선입니다.)
+2. 중요도 판별: 재단 관련 정책, 소상공인 지원, 경제 지표, 의회 행정감사 관련 기사를 '상', '중', '하'로 판별하세요.
+3. 분야 분류: '정책', '지원', '경제', '금융', '의회', '기타' 중 하나로 분류하세요.
+4. 반드시 '상' 또는 '중' 등급을 받은 기사 중 가장 우수한 15개를 선정하여 응답하세요.
 
 [응답 형식]
-반드시 아래 JSON 형식으로만 답변하세요.
+반드시 JSON 형식으로만 답변하세요:
 {
-  "results": [
+  "top15": [
     {"index": 0, "importance": "상", "category": "정책"},
-    {"index": 1, "importance": "중", "category": "금융"},
     ...
   ]
 }
 
-[뉴스 리스트]
-${newsDataForAI}`;
+[뉴스 후보 리스트]
+${newsDataForAI.substring(0, 50000)}`;
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
@@ -423,7 +393,6 @@ ${newsDataForAI}`;
       const resJson = JSON.parse(resp.getContentText());
       let feedback = resJson.candidates[0].content.parts[0].text.trim();
       
-      // JSON 추출 안정화
       if (feedback.startsWith('```')) {
         feedback = feedback.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
       }
@@ -434,15 +403,19 @@ ${newsDataForAI}`;
       }
       
       const parsed = JSON.parse(feedback);
-      parsed.results.forEach(item => {
+      const final15 = [];
+      parsed.top15.forEach(item => {
         if (newsList[item.index]) {
-          newsList[item.index].importance = normalizeImportance(item.importance);
-          newsList[item.index].category = normalizeCategory(item.category);
+          const newsItem = newsList[item.index];
+          newsItem.importance = item.importance || "하";
+          newsItem.category = item.category || "기타";
+          final15.push(newsItem);
         }
       });
+      return final15;
     }
   } catch (e) { console.error("Screening AI Error:", e.message); }
-  return newsList;
+  return newsList.slice(0, 15);
 }
 
 // --- 3단계: AI 전문 정밀 분석 (본문 기반) ---
@@ -499,8 +472,8 @@ ${analyzeSource}
           
           const parsed = JSON.parse(feedback);
           if (parsed.summary) item.aiSummary = parsed.summary;
-          if (parsed.importance) item.importance = normalizeImportance(parsed.importance);
-          if (parsed.category) item.category = normalizeCategory(parsed.category);
+          if (parsed.importance) item.importance = parsed.importance;
+          if (parsed.category) item.category = parsed.category;
         }
       }
     } catch (e) { 
@@ -544,43 +517,7 @@ function extractTextWithAI(textContext, apiKey, title, url) {
   }
 }
 
-// --- Gemini AI를 이용한 뉴스 정제 ---
-function cleanNewsWithAI(newsList) {
-  const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
-  if (!API_KEY) return newsList.slice(0, 100); 
-
-  const context = newsList.map((n, i) => `${i}. [${n.title}] ${n.desc}`).join("\n");
-  const prompt = `당신은 뉴스 편집자입니다. 아래 '서울신용보증재단' 관련 뉴스 목록에서 중복 이슈를 제거하고 중요 뉴스 약 100개를 골라주세요. 
-항목이 부족하면 최대한 많이 선택하세요. 홍보성이라도 재단 관련이면 포함하세요.
-응답은 반드시 JSON 배열로 선택한 인덱스 번호만 주세요. 예: [0, 1, 2, ...]
-
-목록:
-${context.substring(0, 30000)}`;
-
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${API_KEY}`;
-    const payload = {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { response_mime_type: "application/json" }
-    };
-    const response = UrlFetchApp.fetch(url, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload) });
-    const fullContent = JSON.parse(response.getContentText()).candidates[0].content.parts[0].text;
-    
-    // JSON 추출 안정화
-    let cleanJson = fullContent;
-    const jsonStart = cleanJson.indexOf('[');
-    const jsonEnd = cleanJson.lastIndexOf(']') + 1;
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      cleanJson = cleanJson.substring(jsonStart, jsonEnd);
-    }
-    const selectedIndices = JSON.parse(cleanJson);
-    
-    return newsList.filter((_, i) => selectedIndices.includes(i));
-  } catch (e) {
-    console.warn("AI 필터링 실패, 단순 슬라이싱으로 대체:", e.message);
-    return newsList.slice(0, 100);
-  }
-}
+// --- 레거시 필터링 함수 삭제 ---
 
 // --- 전수 조사 분석 엔진 (OCR 지원) ---
 function runAIAnalysis(task, fileId) {

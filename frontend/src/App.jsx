@@ -528,7 +528,7 @@ function App() {
                   <Search size={18} className="search-icon" />
                   <input
                     type="text"
-                    placeholder="제목, 내용, 카테고리 검색..."
+                    placeholder="제목, 내용, 분야 검색..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
