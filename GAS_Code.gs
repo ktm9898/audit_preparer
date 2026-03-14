@@ -398,6 +398,9 @@ ${newsDataForAI}`;
 }
 
 // --- 3단계: AI 전문 정밀 분석 (본문 기반) ---
+function deepAnalyzeNewsWithAI(newsList, apiKey) {
+  if (!apiKey || newsList.length === 0) return newsList;
+
   return newsList.map(item => {
     // 분석 전 스크리닝 결과 백업
     const prevImportance = item.importance;
