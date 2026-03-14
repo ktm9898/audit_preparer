@@ -732,29 +732,29 @@ function App() {
             <div className="modal-body-scroll premium-scroll">
               <div className="news-detail-container">
                 <div className="news-meta-row">
-                  <span className={`importance-badge ${selectedNews.중요도 === '상' ? 'high' : selectedNews.중요도 === '중' ? 'mid' : 'low'}`}>
-                    {selectedNews.중요도 || '하'}
+                  <span className={`importance-badge ${String(selectedNews?.중요도 || selectedNews?.importance || "").trim() === '상' ? 'high' : String(selectedNews?.중요도 || selectedNews?.importance || "").trim() === '중' ? 'mid' : 'low'}`}>
+                    {String(selectedNews?.중요도 || selectedNews?.importance || '하')}
                   </span>
-                  <span className="source-tag">{selectedNews.언론사 || selectedNews.source || "뉴스"}</span>
-                  <span className="date-tag">{(selectedNews.날짜 || "").split(' ')[0]}</span>
-                  <span className="category-tag-modal">#{selectedNews.분야 || selectedNews.category || '기타'}</span>
+                  <span className="source-tag">{String(selectedNews?.언론사 || selectedNews?.source || "뉴스")}</span>
+                  <span className="date-tag">{String(selectedNews?.날짜 || selectedNews?.date || "").split(' ')[0]}</span>
+                  <span className="category-tag-modal">#{String(selectedNews?.분야 || selectedNews?.주제 || selectedNews?.category || '기타')}</span>
                 </div>
-                <h2 className="news-detail-title">{selectedNews.제목 || selectedNews.title}</h2>
-                <a href={selectedNews.링크 || selectedNews.link} target="_blank" rel="noopener noreferrer" className="source-link">
+                <h2 className="news-detail-title">{selectedNews?.제목 || selectedNews?.title || "제목 없음"}</h2>
+                <a href={selectedNews?.링크 || selectedNews?.link} target="_blank" rel="noopener noreferrer" className="source-link">
                   <ArrowUpRight size={14} /> 원문 보기
                 </a>
 
                 <div className="news-section">
                   <div className="section-label">AI 브리핑</div>
                   <div className="ai-briefing-box">
-                    {selectedNews.AI요약 || selectedNews.aiSummary || selectedNews.naverDesc || "요약 정보가 없습니다."}
+                    {selectedNews?.AI요약 || selectedNews?.aiSummary || selectedNews?.naverDesc || "요약 정보가 없습니다."}
                   </div>
                 </div>
 
                 <div className="news-section">
                   <div className="section-label">기사 전문</div>
-                  <div className="full-text-box">
-                    {selectedNews.본문전문 || selectedNews.fullText || "본문 내용이 수집되지 않았습니다."}
+                  <div className="full-text-box" style={{ whiteSpace: 'pre-wrap', maxHeight: '400px', overflowY: 'auto', background: '#f8fafc', padding: '1.5rem', borderRadius: '1rem', border: '1px solid #e2e8f0', fontSize: '0.95rem', lineHeight: '1.8' }}>
+                    {selectedNews?.본문전문 || selectedNews?.fullText || "본문 내용이 수집되지 않았습니다. 원문 링크를 통해 확인해 주세요."}
                   </div>
                 </div>
               </div>

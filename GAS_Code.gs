@@ -317,20 +317,67 @@ function fetchNewsFromNaver(targetMonth) {
   return { ok: true, count: resultNews.length };
 }
 
+// --- 데이터 정규화 정적 함수 ---
+function normalizeImportance(val) {
+  if (!val) return "하";
+  const s = String(val).toLowerCase();
+  if (s.includes('상') || s.includes('high') || s.includes('top')) return "상";
+  if (s.includes('중') || s.includes('mid') || s.includes('medium')) return "중";
+  return "하";
+}
+
+function normalizeCategory(val) {
+  if (!val) return "기타";
+  const s = String(val);
+  const categories = ["정책", "지원", "경제", "금융", "의회", "기타"];
+  for (const cat of categories) {
+    if (s.includes(cat)) return cat;
+  }
+  return "기타";
+}
+
+function cleanTextForAI(text) {
+  if (!text) return "";
+  return text
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[^\w\s가-힣ㄱ-ㅎㅏ-ㅣ.,!?"']/g, ' ') // 특수문자 제거로 UTF-8 오류 방지
+    .trim()
+    .substring(0, 30000);
+}
+
 // --- 추가: 기사 본문 수집 함수 (crawlNewsContent) ---
 function crawlNewsContent(newsList) {
   const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  
   return newsList.map(item => {
     try {
-      // Fail-fast: 15초 타임아웃 적용 및 오류 시 즉시 Skip
-      const response = UrlFetchApp.fetch(item.link, { muteHttpExceptions: true, timeoutSeconds: 15 });
+      console.log(`크롤링 시도: ${item.title}`);
+      const options = {
+        muteHttpExceptions: true,
+        timeoutSeconds: 20,
+        headers: { "User-Agent": userAgent }
+      };
+      const response = UrlFetchApp.fetch(item.link, options);
       if (response.getResponseCode() === 200) {
-        const html = response.getContentText();
+        let html = response.getContentText();
+        // 본문 점유율을 높이기 위해 불필요한 태그 선제거
+        html = html.replace(/<(script|style|nav|header|footer|iframe|svg)[^>]*>([\s\S]*?)<\/\1>/gi, '');
+        html = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(); // 텍스트만 남기거나 태그 최소화
+        
         const extracted = extractTextWithAI(html, API_KEY, item.title, item.link);
-        if (extracted) item.fullText = extracted;
+        if (extracted) {
+          item.fullText = extracted;
+          console.log(`크롤링 성공: ${item.title} (${extracted.length}자)`);
+        } else {
+          console.warn(`추출 실패: ${item.title}`);
+        }
+      } else {
+        console.warn(`Fetch 실패 (${response.getResponseCode()}): ${item.link}`);
       }
     } catch (e) {
-      console.warn(`Skip 기사: ${item.link}, 사유: ${e.message}`);
+      console.warn(`크롤링 예외: ${item.title}, 사유: ${e.message}`);
     }
     return item;
   });
@@ -388,8 +435,8 @@ ${newsDataForAI}`;
       const parsed = JSON.parse(feedback);
       parsed.results.forEach(item => {
         if (newsList[item.index]) {
-          newsList[item.index].importance = item.importance;
-          newsList[item.index].category = item.category;
+          newsList[item.index].importance = normalizeImportance(item.importance);
+          newsList[item.index].category = normalizeCategory(item.category);
         }
       });
     }
@@ -450,9 +497,9 @@ ${analyzeSource}
           }
           
           const parsed = JSON.parse(feedback);
-          item.aiSummary = parsed.summary || item.naverDesc;
-          item.importance = parsed.importance || prevImportance;
-          item.category = parsed.category || prevCategory;
+          if (parsed.summary) item.aiSummary = parsed.summary;
+          if (parsed.importance) item.importance = normalizeImportance(parsed.importance);
+          if (parsed.category) item.category = normalizeCategory(parsed.category);
         }
       }
     } catch (e) { 
@@ -466,20 +513,30 @@ ${analyzeSource}
   });
 }
 
-function extractTextWithAI(html, apiKey, title, url) {
-  if (!apiKey) return null;
-  const slicedHtml = html.length > 25000 ? html.substring(0, 25000) : html;
-  const prompt = `뉴스 제목: ${title}\nURL: ${url}\n\n[지시사항]\n제공된 HTML에서 기사 "본문"만 깨끗하게 추출하세요. 광고/메뉴/댓글 지우고 텍스트만. 추출 불가능하면 핵심 요약이라도 찾으세요.\n\n[HTML]\n${slicedHtml}`;
+function extractTextWithAI(textContext, apiKey, title, url) {
+  if (!apiKey || !textContext) return null;
+  // 정제된 텍스트에서 본문 추출 (페이로드 확보 위해 최대 40,000자)
+  const slicedContext = textContext.length > 40000 ? textContext.substring(0, 40000) : textContext;
+  const prompt = `뉴스 제목: ${title}\nURL: ${url}\n\n[지시사항]\n제공된 텍스트 데이터에서 기사의 "핵심 본문 전문"만 추출하세요.\n광고, 메뉴, 관련뉴스 목록 등 불필요한 정보는 모두 배제하고 기사 내용만 깨끗하게 응답하세요.\n만약 본문이 없다면 기사의 핵심 내용을 300자 내외로 요약해서 응답하세요.\n\n[데이터]\n${slicedContext}`;
 
   try {
     const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
     const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const resp = UrlFetchApp.fetch(apiURL, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true });
-    if (resp.getResponseCode() !== 200) return null;
-    const content = JSON.parse(resp.getContentText());
-    const extracted = content.candidates[0].content.parts[0].text.trim();
-    if (!extracted || extracted.length < 50) return null; // 너무 짧으면 실패로 간주
-    return extracted;
+    const resp = UrlFetchApp.fetch(apiURL, { 
+      method: "POST", 
+      contentType: "application/json", 
+      payload: JSON.stringify(payload), 
+      muteHttpExceptions: true 
+    });
+    
+    if (resp.getResponseCode() === 200) {
+      const content = JSON.parse(resp.getContentText());
+      if (content.candidates && content.candidates[0].content && content.candidates[0].content.parts) {
+        const extracted = content.candidates[0].content.parts[0].text.trim();
+        if (extracted.length > 20) return extracted;
+      }
+    }
+    return null;
   } catch (e) { 
     console.error(`추출 AI 오류: ${e.message}`);
     return null; 
