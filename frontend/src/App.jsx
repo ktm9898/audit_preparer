@@ -565,6 +565,11 @@ function App() {
                             const category = item.분야 || item.category || item.주제 || ""; // '분야' 우선
                             const searchStr = (title + summary + category).toLowerCase();
                             return searchStr.includes(searchTerm.toLowerCase());
+                          })
+                          .sort((a, b) => {
+                            const dateA = a.날짜 || a.date || "";
+                            const dateB = b.날짜 || b.date || "";
+                            return dateB.localeCompare(dateA); // 최신순 정렬
                           });
 
                         if (filteredNews.length === 0) {
