@@ -219,7 +219,7 @@ function fetchNewsFromNaver(targetMonth) {
     
     if (isTrustedMedia(link)) {
       const date = new Date(item.pubDate);
-      const monthStr = Utilities.formatDate(date, "GMT+9", "yyyy.MM");
+      const dateStr = Utilities.formatDate(date, "GMT+9", "yyyy.MM.dd");
       
       let sourceName = "뉴스";
       try {
@@ -246,7 +246,7 @@ function fetchNewsFromNaver(targetMonth) {
         cleanTitle: title, 
         cleanLink: link, 
         sourceName, 
-        monthStr, 
+        dateStr, 
         pubTimestamp: date.getTime() 
       });
     }
@@ -257,7 +257,7 @@ function fetchNewsFromNaver(targetMonth) {
   // 3. AI 지능형 선별 (AI Call 1: Screening & Dedup)
   // 1,000건의 후보를 AI에게 전달하여 중복을 제거하고 정예 15건을 선발
   const initialNewsList = processedItems.map(item => ({
-    date: item.monthStr,
+    date: item.dateStr,
     category: "-", 
     source: item.sourceName || "뉴스",
     title: item.cleanTitle,

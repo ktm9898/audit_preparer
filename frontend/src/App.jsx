@@ -515,7 +515,10 @@ function App() {
                     <option value="all">전체 기간</option>
                     {(news || [])
                       .filter(Boolean)
-                      .map(n => n.날짜 || n.date)
+                      .map(n => {
+                        const d = n.날짜 || n.date;
+                        return d ? String(d).substring(0, 7) : null; // "2024.03.15" -> "2024.03"
+                      })
                       .filter(Boolean)
                       .reduce((acc, curr) => (acc.includes(curr) ? acc : [...acc, curr]), [])
                       .sort()
@@ -554,8 +557,8 @@ function App() {
                         const filteredNews = (news || [])
                           .filter(item => {
                             if (!item) return false;
-                            const itemMonth = item.날짜 || item.date;
-                            if (filterMonth !== 'all' && itemMonth !== filterMonth) return false;
+                            const fullDate = item.날짜 || item.date || "";
+                            if (filterMonth !== 'all' && !fullDate.startsWith(filterMonth)) return false;
                             
                             const title = item.제목 || item.title || "";
                             const summary = item.AI요약 || item.aiSummary || item.naverDesc || "";
