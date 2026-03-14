@@ -236,10 +236,19 @@ function fetchNewsFromNaver(targetMonth) {
       let sourceName = "뉴스";
       try {
         const domain = link.split('/')[2].replace('www.', '').replace('m.', '');
-        const domainMap = { 'chosun': '조선일보', 'joongang': '중앙일보', 'donga': '동아일보', 'yna': '연합뉴스', 'newsis': '뉴시스', 'news1': '뉴스1', 'sedaily': '서울경제', 'edaily': '이데일리', 'hankyung': '한국경제', 'mk.co.kr': '매일경제', 'hani': '한겨레', 'khan': '경향신문', 'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS' };
+        const domainMap = { 
+          'chosun': '조선일보', 'joongang': '중앙일보', 'donga': '동아일보', 'yna': '연합뉴스', 
+          'newsis': '뉴시스', 'news1': '뉴스1', 'sedaily': '서울경제', 'edaily': '이데일리', 
+          'hankyung': '한국경제', 'mk.co.kr': '매일경제', 'hani': '한겨레', 'khan': '경향신문', 
+          'kmib': '국민일보', 'segye': '세계일보', 'seoul.co.kr': '서울신문', 'munhwa': '문화일보', 
+          'moneytoday': '머니투데이', 'mt.co.kr': '머니투데이', 'asiae': '아시아경제', 'ajunews': '아주경제',
+          'fnnews': '파이낸셜뉴스', 'heraldcorp': '헤럴드경제', 'etnews': '전자신문', 'digitaltimes': '디지털타임스',
+          'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS', 'ytn': 'YTN'
+        };
         for (const keyInMap in domainMap) {
           if (domain.includes(keyInMap)) { sourceName = domainMap[keyInMap]; break; }
         }
+        if (sourceName === "뉴스") sourceName = domain.split('.')[0].toUpperCase(); 
       } catch(e) {}
 
       visitedLinks.add(link);
@@ -256,14 +265,14 @@ function fetchNewsFromNaver(targetMonth) {
 
   const initialNewsList = candidatePool.map(item => ({
     date: item.monthStr,
-    category: "일반",
-    source: item.sourceName,
+    category: "-", 
+    source: item.sourceName || "뉴스",
     title: item.cleanTitle,
     naverDesc: item.description.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').trim(),
     fullText: "", 
     link: item.cleanLink,
     aiSummary: "", 
-    importance: "-",
+    importance: "-", 
     pubTimestamp: item.pubTimestamp
   }));
 
@@ -284,7 +293,7 @@ function fetchNewsFromNaver(targetMonth) {
     })
     .slice(0, 15);
 
-  console.log(`최종 정예 ${finalTop15.length}건에 대해 본문 추출 및 심층 분석 시작...`);
+  console.log(`정예 선별 완료: ${finalTop15.length}건. (Screened: ${finalTop15.map(n=>n.importance).join(', ')})`);
 
   // [Stage 2 & 3] 정예 15건에 대해서만 전문 크롤링 및 분석 수행
   const crawledNews = crawlNewsContent(finalTop15);
@@ -393,15 +402,16 @@ ${newsDataForAI}`;
 function deepAnalyzeNewsWithAI(newsList, apiKey) {
   if (!apiKey || newsList.length === 0) return newsList;
 
-  return newsList.map(item => {
-    if (!item.fullText || item.fullText.length < 200) {
-      item.aiSummary = item.naverDesc;
-      return item;
+    if (!item.fullText || item.fullText.length < 100) {
+      console.log(`기사 본문 부족(${item.fullText?.length || 0}자). 네이버 요약 기반 분석 진행: ${item.title}`);
+      analyzeSource = item.naverDesc;
+    } else {
+      analyzeSource = item.fullText.substring(0, 5000);
     }
 
     const prompt = `뉴스 제목: ${item.title}
-본문 전문:
-${item.fullText.substring(0, 5000)}
+본문 내용:
+${analyzeSource}
 
 [지시사항]
 1. 위 기사 본문을 분석하여 핵심 내용을 2~3문장의 명확한 문체로 요약하세요.
@@ -455,8 +465,13 @@ function extractTextWithAI(html, apiKey, title, url) {
     const resp = UrlFetchApp.fetch(apiURL, { method: "POST", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true });
     if (resp.getResponseCode() !== 200) return null;
     const content = JSON.parse(resp.getContentText());
-    return content.candidates[0].content.parts[0].text.trim();
-  } catch (e) { return null; }
+    const extracted = content.candidates[0].content.parts[0].text.trim();
+    if (!extracted || extracted.length < 50) return null; // 너무 짧으면 실패로 간주
+    return extracted;
+  } catch (e) { 
+    console.error(`추출 AI 오류: ${e.message}`);
+    return null; 
+  }
 }
 
 // --- Gemini AI를 이용한 뉴스 정제 ---

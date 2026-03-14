@@ -556,34 +556,42 @@ function App() {
                           return <tr><td colSpan="5" className="empty-row">검색 조건에 맞는 뉴스가 없습니다.</td></tr>;
                         }
 
-                        return filteredNews.map((item, idx) => (
-                          <tr key={idx} className="news-row clickable" onClick={() => setSelectedNews(item)}>
-                            <td className="importance-cell">
-                              <span className={`importance-badge ${item.중요도 === '상' ? 'high' : item.중요도 === '중' ? 'mid' : 'low'}`}>
-                                {item.중요도 || '하'}
-                              </span>
-                              <div className="category-label">#{item.분야 || item.category || '기타'}</div>
-                            </td>
-                            <td className="info-cell">
-                              <div className="news-title-premium">{item.제목 || item.title}</div>
-                              <div className="news-meta-mini">
-                                <span className="source">{item.언론사 || item.source || "뉴스"}</span>
-                                <span className="dot">·</span>
-                                <span className="date">{(item.날짜 || item.date || "").split(' ')[0] || "오늘"}</span>
-                              </div>
-                            </td>
-                            <td className="summary-cell">
-                              <div className="news-summary-text">
-                                {item.AI요약 || item.aiSummary || item.naverDesc || "상세 내용을 확인해 주세요."}
-                              </div>
-                            </td>
-                            <td className="action-cell">
-                              <button className="icon-link-circle" onClick={e => { e.stopPropagation(); window.open(item.링크 || item.link); }}>
-                                <ExternalLink size={16} />
-                              </button>
-                            </td>
-                          </tr>
-                        ));
+                        return filteredNews.map((item, idx) => {
+                          if (!item) return null;
+                          const importance = item.중요도 || item.importance || '하';
+                          const category = item.분야 || item.category || '기타';
+                          const title = item.제목 || item.title || '제목 없음';
+                          const source = item.언론사 || item.source || '뉴스';
+                          const date = (item.날짜 || item.date || '오늘').split(' ')[0];
+                          const summary = item.AI요약 || item.aiSummary || item.naverDesc || '내용 없음';
+
+                          return (
+                            <tr key={idx} className="news-row clickable" onClick={() => setSelectedNews(item)}>
+                              <td className="importance-cell">
+                                <span className={`importance-badge ${importance === '상' ? 'high' : importance === '중' ? 'mid' : 'low'}`}>
+                                  {importance}
+                                </span>
+                                <div className="category-label">#{category}</div>
+                              </td>
+                              <td className="info-cell">
+                                <div className="news-title-premium">{title}</div>
+                                <div className="news-meta-mini">
+                                  <span className="source">{source}</span>
+                                  <span className="dot">·</span>
+                                  <span className="date">{date}</span>
+                                </div>
+                              </td>
+                              <td className="summary-cell">
+                                <div className="news-summary-text">{summary}</div>
+                              </td>
+                              <td className="action-cell">
+                                <button className="icon-link-circle" onClick={e => { e.stopPropagation(); window.open(item.링크 || item.link); }}>
+                                  <ExternalLink size={16} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        });
                       })()}
                     </tbody>
                   </table>
