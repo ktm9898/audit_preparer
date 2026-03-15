@@ -635,81 +635,128 @@ function App() {
               <div className="section-header">
                 <div className="title-row">
                   <HelpCircle size={24} className="title-icon" />
-                  <h2>리스크 분석 및 예상 질문</h2>
+                  <h2>행정감사 상정 질문 및 대응</h2>
                 </div>
                 <div className="btn-group">
                   <button className="action-btn secondary" onClick={() => handleAction('risks')}>
-                    <ShieldAlert size={16} /> 1단계: 리스크 추출
+                    <Newspaper size={16} /> 1단계: 뉴스 리스크 추출
                   </button>
-                  <button className="action-btn primary" onClick={() => handleAction('questions')}>
-                    <MessageSquare size={16} /> 2단계: 예상 질문 및 답변 생성
+                  <button className="action-btn secondary" onClick={() => handleAction('report_risks')}>
+                    <FileText size={16} /> 2단계: 보고서 리스크 추출
+                  </button>
+                  <button className="action-btn primary" onClick={() => handleAction('final_questions')}>
+                    <MessageSquare size={16} /> 3단계: 최종 예상 질문 생성
                   </button>
                 </div>
               </div>
 
-              <div className="analysis-pipeline-info">
-                <div className="info-txt">
-                  <AlertTriangle size={16} className="text-warning" />
-                  <span>"주요 뉴스" 데이터를 기반으로 <b>리스크 추출</b>을 먼저 실행한 뒤, 최종 <b>예상 질문</b>을 생성하십시오.</span>
-                </div>
-              </div>
-
-              <div className="questions-flow">
-                <div className="analysis-step">
-                  <div className="step-header">
-                    <div className="step-num">Step 1</div>
-                    <h3>분석된 리스크 요인 (총 {risks.length}건)</h3>
-                  </div>
-                  {risks.length === 0 ? (
-                    <div className="empty-state-card">
-                      <ShieldAlert size={32} className="icon-muted" />
-                      <p>상단의 [리스크 추출] 버튼을 눌러 분석을 시작하세요.</p>
+              <div className="layout-with-sidebar">
+                <div className="main-content">
+                  <div className="analysis-pipeline-info">
+                    <div className="info-txt">
+                      <AlertTriangle size={16} className="text-warning" />
+                      <span>뉴스(1단계)와 업무보고(2단계) 분석을 완료한 후 <b>3단계 버튼</b>을 눌러 최종 예상 질문을 생성하십시오.</span>
                     </div>
-                  ) : (
-                    <div className="risk-horizontal-scroll">
-                      {risks.map((r, i) => (
-                        <div key={i} className="flow-risk-card">
-                          <h4>{r["리스크 요인"] || r["요인"]}</h4>
-                          <p>{r["세부 내용"] || r["내용"]}</p>
-                          <div className="evidence">근거: {r["관련 근거"] || r["근거"] || "수집 뉴스 데이터"}</div>
+                  </div>
+
+                  <div className="questions-flow vertical">
+                    <div className="risks-comparison-grid">
+                      <div className="analysis-step">
+                        <div className="step-header">
+                          <div className="step-num">Step 1</div>
+                          <h3>주요 뉴스 기반 리스크 (총 {risks1.length}건)</h3>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="analysis-step">
-                  <div className="step-header">
-                    <div className="step-num">Step 2</div>
-                    <h3>최종 예상 질문 및 대응 가이드 ({questions.length}개)</h3>
-                  </div>
-
-                  <div className="questions-grid">
-                    {questions.length === 0 ? (
-                      <div className="empty-state-card">
-                        <MessageSquare size={32} className="icon-muted" />
-                        <p>리스크가 추출된 상태에서 [예상 질문 및 답변 생성]을 진행하세요.</p>
+                        <div className="risk-mini-list premium-scroll">
+                          {risks1.length === 0 ? (
+                            <div className="empty-state-mini">데이터가 없습니다. 분석을 실행하세요.</div>
+                          ) : (
+                            risks1.map((r, i) => (
+                              <div key={i} className="mini-risk-item">
+                                <span className="num">{i + 1}</span>
+                                <div className="txt">
+                                  <strong>{r["리스크 요인"] || r["요인"]}</strong>
+                                  <p>{r["세부 내용"] || r["내용"]}</p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      questions.map((q, i) => (
-                        <div key={i} className="premium-question-card">
-                          <div className="q-badge">예상 질문 {i + 1}</div>
-                          <div className="q-content">
-                            <h4 className="question-text">{q["예상 질문"] || q["질문"]}</h4>
-                            <div className="answer-section">
-                              <div className="label">대응 가이드 및 답변 방향</div>
-                              <p className="answer-text">{q["답변 가이드"] || q["답변 방향"] || q["대응방안"] || q["답변"]}</p>
-                            </div>
-                            <div className="q-meta">
-                              <span>작성자: AI 분석 엔진</span>
-                              {q["분류"] && <span className="ml-2">| 분류: {q["분류"]}</span>}
-                            </div>
-                          </div>
+
+                      <div className="analysis-step">
+                        <div className="step-header">
+                          <div className="step-num">Step 2</div>
+                          <h3>보고서 기반 리스크 (총 {risks2.length}건)</h3>
                         </div>
-                      ))
-                    )}
+                        <div className="risk-mini-list premium-scroll">
+                          {risks2.length === 0 ? (
+                            <div className="empty-state-mini">데이터가 없습니다. 분석을 실행하세요.</div>
+                          ) : (
+                            risks2.map((r, i) => (
+                              <div key={i} className="mini-risk-item">
+                                <span className="num pink">{i + 1}</span>
+                                <div className="txt">
+                                  <strong>{r["리스크 요인"] || r["요인"]}</strong>
+                                  <p>{r["세부 내용"] || r["내용"]}</p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="analysis-step full-width">
+                      <div className="step-header">
+                        <div className="step-num">Step 3</div>
+                        <h3>최종 예상 질문 및 대응 가이드 (총 {questions.length}건)</h3>
+                      </div>
+                      
+                      <div className="questions-table-container premium-shadow">
+                        <table className="premium-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: '100px' }}>분류</th>
+                              <th style={{ width: '120px' }}>의원</th>
+                              <th>예상 질문</th>
+                              <th>대응 가이드 및 답변 방향</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {questions.length === 0 ? (
+                              <tr><td colSpan="4" className="empty-row">분석을 실행하여 최종 질문을 생성하세요.</td></tr>
+                            ) : (
+                              questions.map((q, i) => (
+                                <tr key={i}>
+                                  <td><span className="field-tag">{q["분류"] || "일반"}</span></td>
+                                  <td><span className="source">{q["의원명"] || "미확인"}</span></td>
+                                  <td><div className="q-text-cell">{q["질문"] || q["예상 질문"]}</div></td>
+                                  <td><div className="a-text-cell">{q["답변 가이드"] || q["답변 방향"] || q["대응방안"]}</div></td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
+                <aside className="sidebar">
+                  <MiniFileManager
+                    files={reportFiles}
+                    type="report"
+                    label="업무보고 자료"
+                    onUpload={handleFileUpload}
+                    onDelete={handleDeleteFile}
+                  />
+                  <div className="sidebar-help-card">
+                    <h4><Database size={14} /> 분석 가이드</h4>
+                    <p>1. <strong>사이드바</strong>에 업무보고 PDF나 텍스트 파일을 업로드하세요.</p>
+                    <p>2. <strong>Step 1, 2</strong> 버튼을 눌러 각각의 리스크를 추출하세요.</p>
+                    <p>3. <strong>Step 3</strong> 버튼을 눌러 최종 질문을 생성하세요.</p>
+                  </div>
+                </aside>
               </div>
             </div>
           )}
