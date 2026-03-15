@@ -635,7 +635,7 @@ function App() {
               <div className="section-header">
                 <div className="title-row">
                   <HelpCircle size={24} className="title-icon" />
-                  <h2>행정감사 상정 질문 및 대응</h2>
+                  <h2>리스크 분석 및 예상 질문</h2>
                 </div>
                 <div className="btn-group">
                   <button className="action-btn secondary" onClick={() => handleAction('risks')}>
@@ -655,57 +655,58 @@ function App() {
                   <div className="analysis-pipeline-info">
                     <div className="info-txt">
                       <AlertTriangle size={16} className="text-warning" />
-                      <span>뉴스(1단계)와 업무보고(2단계) 분석을 완료한 후 <b>3단계 버튼</b>을 눌러 최종 예상 질문을 생성하십시오.</span>
+                      <span>뉴스(1단계)와 업무보고(2단계) 분석 결과를 바탕으로 <b>최종 예상 질문</b>을 생성하십시오.</span>
                     </div>
                   </div>
 
                   <div className="questions-flow vertical">
-                    <div className="risks-comparison-grid">
-                      <div className="analysis-step">
-                        <div className="step-header">
-                          <div className="step-num">Step 1</div>
-                          <h3>주요 뉴스 기반 리스크 (총 {risks1.length}건)</h3>
-                        </div>
-                        <div className="risk-mini-list premium-scroll">
-                          {risks1.length === 0 ? (
-                            <div className="empty-state-mini">데이터가 없습니다. 분석을 실행하세요.</div>
-                          ) : (
-                            risks1.map((r, i) => (
-                              <div key={i} className="mini-risk-item">
-                                <span className="num">{i + 1}</span>
-                                <div className="txt">
-                                  <strong>{r["리스크 요인"] || r["요인"]}</strong>
-                                  <p>{r["세부 내용"] || r["내용"]}</p>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
+                    {/* Step 1: News Risks (Horizontal Scroll Cards) */}
+                    <div className="analysis-step">
+                      <div className="step-header">
+                        <div className="step-num">Step 1</div>
+                        <h3>주요 뉴스 기반 리스크 (총 {risks1.length}건)</h3>
                       </div>
-
-                      <div className="analysis-step">
-                        <div className="step-header">
-                          <div className="step-num">Step 2</div>
-                          <h3>보고서 기반 리스크 (총 {risks2.length}건)</h3>
+                      {risks1.length === 0 ? (
+                        <div className="empty-state-card wide">
+                          <p>데이터가 없습니다. 분석을 실행하세요.</p>
                         </div>
-                        <div className="risk-mini-list premium-scroll">
-                          {risks2.length === 0 ? (
-                            <div className="empty-state-mini">데이터가 없습니다. 분석을 실행하세요.</div>
-                          ) : (
-                            risks2.map((r, i) => (
-                              <div key={i} className="mini-risk-item">
-                                <span className="num pink">{i + 1}</span>
-                                <div className="txt">
-                                  <strong>{r["리스크 요인"] || r["요인"]}</strong>
-                                  <p>{r["세부 내용"] || r["내용"]}</p>
-                                </div>
-                              </div>
-                            ))
-                          )}
+                      ) : (
+                        <div className="risk-horizontal-scroll">
+                          {risks1.map((r, i) => (
+                            <div key={i} className="flow-risk-card">
+                              <h4>{r["리스크 요인"] || r["요인"]}</h4>
+                              <p>{r["세부 내용"] || r["내용"]}</p>
+                              <div className="evidence">근거: {r["관련 근거"] || r["근거"] || "수집 뉴스 데이터"}</div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
+                      )}
                     </div>
 
+                    {/* Step 2: Report Risks (Horizontal Scroll Cards) */}
+                    <div className="analysis-step">
+                      <div className="step-header">
+                        <div className="step-num">Step 2</div>
+                        <h3>보고서 기반 리스크 (총 {risks2.length}건)</h3>
+                      </div>
+                      {risks2.length === 0 ? (
+                        <div className="empty-state-card wide">
+                          <p>데이터가 없습니다. 분석을 실행하세요.</p>
+                        </div>
+                      ) : (
+                        <div className="risk-horizontal-scroll">
+                          {risks2.map((r, i) => (
+                            <div key={i} className="flow-risk-card pink-border">
+                              <h4>{r["리스크 요인"] || r["요인"]}</h4>
+                              <p>{r["세부 내용"] || r["내용"]}</p>
+                              <div className="evidence">근거: {r["관련 근거"] || r["근거"] || "업무보고 자료"}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Step 3: Final Questions Table */}
                     <div className="analysis-step full-width">
                       <div className="step-header">
                         <div className="step-num">Step 3</div>
@@ -750,12 +751,6 @@ function App() {
                     onUpload={handleFileUpload}
                     onDelete={handleDeleteFile}
                   />
-                  <div className="sidebar-help-card">
-                    <h4><Database size={14} /> 분석 가이드</h4>
-                    <p>1. <strong>사이드바</strong>에 업무보고 PDF나 텍스트 파일을 업로드하세요.</p>
-                    <p>2. <strong>Step 1, 2</strong> 버튼을 눌러 각각의 리스크를 추출하세요.</p>
-                    <p>3. <strong>Step 3</strong> 버튼을 눌러 최종 질문을 생성하세요.</p>
-                  </div>
                 </aside>
               </div>
             </div>
