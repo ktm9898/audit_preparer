@@ -540,153 +540,114 @@ function extractTextWithAI(textContext, apiKey, title, url) {
     return null; 
   }
 }
-
-// --- 레거시 필터링 함수 삭제 ---
-
-// --- 전수 조사 분석 엔진 (OCR 지원) ---
 function runAIAnalysis(task, fileId) {
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const parent = getOrCreateFolder();
   let aggregatedText = "";
   const contents = { parts: [] };
+  let prompt = "";
 
   if (task === 'risks') {
     const newsSheet = getOrCreateSheet(ss, '주요 뉴스');
-    const context = newsSheet.getDataRange().getValues().slice(1).map(r => `[${r[0]}] ${r[2]}: ${r[3]}`).join("\n");
-    var prompt = `[지시사항] 반드시 제공된 뉴스 데이터에 기반하여 리스크를 도출하세요. 없는 사실을 지어내지 마세요.
-[미션] 서울신용보증재단 뉴스 데이터를 바탕으로 행정감사 리스크 쟁점 20개를 도출하세요. 
+    const newsData = newsSheet.getDataRange().getValues().slice(1).map(r => `[${r[0]}] ${r[2]}: ${r[3]}`).join("\n");
+    prompt = `[미션] 서울신용보증재단 뉴스 데이터를 바탕으로 행정감사 리스크 쟁점 20개를 도출하세요. 
 (JSON 형식: {"risks": [{"리스크 요인": "...", "세부 내용": "...", "관련 근거": "..."}]})
 
 데이터:
-${context}`;
+${newsData}`;
   } else if (task === 'report_risks') {
-    // 1. 업무보고 자료 취합
     const folder = getSubFolder(parent, 'reports');
     const files = folder.getFiles();
     while (files.hasNext()) {
       const f = files.next();
       const blob = f.getBlob();
-      const mimeType = blob.getContentType();
-      if (mimeType === "application/pdf") {
+      if (blob.getContentType() === "application/pdf") {
         contents.parts.push({ inlineData: { data: Utilities.base64Encode(blob.getBytes()), mimeType: "application/pdf" } });
-        aggregatedText += `\n[문서] 파일명: ${f.getName()} (PDF 원본)`;
+        aggregatedText += `\n[문서] ${f.getName()} (PDF 원본)`;
       } else {
         const txt = blob.getDataAsString();
-        aggregatedText += `\n[문서] 파일명: ${f.getName()}\n${txt}\n`;
+        contents.parts.push({ text: `\n[문서] ${f.getName()}\n${txt}\n` });
+        aggregatedText += txt;
       }
     }
     if (contents.parts.length === 0) return { ok: false, error: "분석할 업무보고 자료가 없습니다." };
-    
-    var prompt = `[미션] 업로드된 업무보고 자료를 분석하여 행정감사 리스크 쟁점 20개를 도출하세요.
-각 리스크는 구체적인 수치 기반이거나 실무적인 문제점을 포함해야 합니다.
+    prompt = `[미션] 업로드된 업무보고 자료를 분석하여 행정감사 리스크 쟁점 20개를 도출하세요.
 (JSON 형식: {"risks": [{"리스크 요인": "...", "세부 내용": "...", "관련 근거": "..."}]})
 
 [데이터 원본]
 ${aggregatedText}`;
   } else if (task === 'final_questions') {
-    // 1. 관련 데이터 보강 (리스크1, 리스크2, 의원 관심사)
     const risk1 = getTabData(ss, '리스크 추출1').map(r => `- ${r['리스크 요인']}: ${r['세부 내용']}`).join("\n");
     const risk2 = getTabData(ss, '리스크 추출2').map(r => `- ${r['리스크 요인']}: ${r['세부 내용']}`).join("\n");
-    const personas = getTabData(ss, '의원별 관심사').map(p => `- ${p['의원명']}(${p['지역구']}): 관심사[${p['주요 관심사']}], 성향[${p['질문 성향']}], 감사포인트[${p['예상 감사 포인트']}]`).join("\n");
-    
-    var prompt = `[미션] 제공된 '뉴스 기반 리스크', '업무보고 기반 리스크' 그리고 '의원별 관심사' 데이터를 종합하여 최종 행정감사 예상 질문 30개를 생성하세요.
+    const personas = getTabData(ss, '의원별 관심사').map(p => `- ${p['의원명']}(${p['지역구']}): 관심사[${p['주요 관심사']}], 성향[${p['질문 성향']}]`).join("\n");
+    const newsData = getTabData(ss, '주요 뉴스').slice(0, 20).map(n => `[뉴스] ${n['제목']}\n- 요약: ${n['AI요약']}`).join("\n\n");
 
-[핵심 지침 - 필독]
-1. 과거 질문 반복 절대 금지: 의원 정보에 포함된 과거 발언이나 감사 포인트는 해당 의원의 '관심 분야'와 '공격 스타일'을 파악하기 위한 메타데이터일 뿐입니다. 기존에 이미 나왔던 질문을 다시 언급하는 것은 의미가 없습니다.
-2. 현재 리스크 기반 신규 예측: 질문의 소재는 반드시 'Step 1(뉴스 리스크)'과 'Step 2(보고서 리스크)'에서 도출된 최신 이슈여야 합니다. 
-3. 페르소나 투영 및 가상 질의: "이 성향을 가진 의원이 현재의 이 리스크를 본다면 어떻게 새롭게 공격할 것인가?"를 시뮬레이션하세요.
-   - 예: '예산 낭비'를 싫어하는 의원 + '홍보비 증가 뉴스' -> 과거 질문 반복이 아니라, 현재 뉴스에 나온 홍보비 증가액을 조목조목 따지는 새 질문 생성.
-4. 구체적 데이터 요구: 질문은 재단이 당황할 정도로 구체적인 수치나 근거 데이터 제출을 요구하는 날카로운 형식이어야 합니다.
-5. 풍부한 답변 가이드: 답변 방향은 재단이 논리적으로 방어할 수 있는 구체적인 수치나 반박 논리 위주로 작성하세요.
-
-[데이터]
-1. 뉴스 기반 리스크 (Step 1):
-${risk1}
-
-2. 업무보고 기반 리스크 (Step 2):
-${risk2}
-
-3. 의원별 관심사 및 성향 (공격 스타일 파악용 메타데이터):
-${personas}
-
-(JSON 형식: {"questions": [{"분류": "...", "의원명": "...", "질문": "...", "답변 가이드": "..."}]})`;
-  } else {
-    // 1. 데이터 취합 및 파일 전송 준비 (멀티모달 대응)
-
-    if (fileId) {
-      const file = DriveApp.getFileById(fileId);
-      const blob = file.getBlob();
-      const mimeType = blob.getContentType();
-      
-      if (mimeType === "application/pdf") {
+    const reportsFolder = getSubFolder(parent, 'reports');
+    const rFiles = reportsFolder.getFiles();
+    let sourceTexts = "";
+    while (rFiles.hasNext()) {
+      const f = rFiles.next();
+      const blob = f.getBlob();
+      if (blob.getContentType() === "application/pdf") {
         contents.parts.push({ inlineData: { data: Utilities.base64Encode(blob.getBytes()), mimeType: "application/pdf" } });
-        aggregatedText = `[단일 PDF 분석] 파일명: ${file.getName()}`;
+        sourceTexts += `\n[업무보고 원문] ${f.getName()} (PDF)`;
       } else {
         const txt = blob.getDataAsString();
-        contents.parts.push({ text: `[단일 텍스트 분석] 파일명: ${file.getName()}\n${txt}` });
-        aggregatedText = txt;
-      }
-    } else {
-      const folderName = task === 'persona' ? 'minutes' : 'reports';
-      const folder = getSubFolder(parent, folderName);
-      const files = folder.getFiles();
-      let fileIndex = 1;
-      
-      while (files.hasNext()) {
-        const f = files.next();
-        const blob = f.getBlob();
-        const mimeType = blob.getContentType();
-        
-        if (mimeType === "application/pdf") {
-          contents.parts.push({ inlineData: { data: Utilities.base64Encode(blob.getBytes()), mimeType: "application/pdf" } });
-          aggregatedText += `\n[문서 #${fileIndex}] 파일명: ${f.getName()} (PDF 원본 전달)`;
-        } else {
-          const txt = blob.getDataAsString();
-          contents.parts.push({ text: `\n[문서 #${fileIndex}] 파일명: ${f.getName()}\n---내용 시작---\n${txt}\n---내용 끝---\n` });
-          aggregatedText += txt;
-        }
-        fileIndex++;
+        contents.parts.push({ text: `\n[업무보고 원문] ${f.getName()}\n${txt}\n` });
+        sourceTexts += txt;
       }
     }
 
-    if (contents.parts.length === 0) return { ok: false, error: "분석할 파일이 없습니다." };
-    
-    // 2. 고도화된 프롬프트 작성 (3단계 인지 프로세스 도입)
-    const systemInstruction = `당신은 대한민국 지방의회 행정사무감사 전문 분석 AI입니다.
-[필수 분석 단계]
-1단계: 문서(회의록) 전체를 훑어 발언 인물을 정확히 식별하십시오.
-2단계: 식별된 의원의 '지역구' 정보를 문서 내에서 찾아내십시오. (못 찾으면 '지역구 미확인')
-3단계: 각 인물의 핵심 발언과 성향을 '상세하고 논리적으로' 요약하십시오. (약 700~1000자 내외로 상세 분석)
-   - 단순히 "질문했다"가 아니라, 질문의 배경, 의원이 사용한 구체적인 데이터/수치, 비판의 논조, 재단측 답변에 대한 재반박 내용 등을 모두 포함하십시오.
-   - 의원이 주로 사용하는 단어나 말투의 특징도 반영하십시오.
-4단계: 요약된 내용을 바탕으로 실무자가 '즉시 대응' 가능한 의원별 상세 성향 리포트를 완성하십시오.
+    prompt = `[미션] 리스크 요인(Step 1,2), 의원 성향, 그리고 '보고서/뉴스 원문'을 종합하여 최종 행정감사 예상 질문 30개를 생성하세요.
 
-[절대 원칙]
-- **누락 제로**: 회의록에 등장하여 질문이나 발언을 한 의원은 **단 한 명도 누락해서는 안 됩니다.** 질문이 단 하나인 의원이라도 반드시 포함하십시오.
-- **전수 식별**: 분석 시작 전, 회의록 전체에서 발언한 모든 의원의 명단을 먼저 추출하고, 그 명단에 있는 모든 인물에 대해 리포트를 작성하십시오.
-- **디테일 유지**: '발언요약' 항목은 이 시스템의 핵심입니다. 회의록 내용을 최대한 많이 복원하여 상세히 적으십시오. 소설을 쓰지 말고 '사실에 기반한 디테일'을 채우십시오.
-- **입력 규모 대응**: 분석해야 할 의원이 많을 경우, 개별 요약의 길이를 핵심 위주로 소폭 조정하더라도 **인원수를 줄여서는 절대 안 됩니다.**
-- '예상 감사 포인트'는 의원의 과거 질문 패턴을 분석해 이번 감사에서 공격해올 구체적인 아킬레스건을 3개 이상 제시하십시오.`;
+[핵심 지침]
+1. 원문 맥락 철저 분석: 추출된 리스크(Step 1,2)는 방향성 가이드일 뿐입니다. 실제 질문은 반드시 함께 제공된 '뉴스 원문'과 '업무보고 원문'의 구체적인 수치, 사업명, 문제 사례를 깊이 있게 파고들어야 합니다.
+2. 과거 질문 반복 절대 금지: 의원 성향 데이터에 있는 과거 발언은 '스타일 파악용'입니다. 기존 질문을 재탕하지 마십시오.
+3. 융합적 분석: "의원 페르소나 + 원문 내 구체적 사안(Source Context) + 현재의 이슈(News)"를 결합하세요.
+4. 실무적 예리함: 구체적인 데이터나 페이지, 사업명을 인용하여 날카로운 질문을 설계하세요.
 
-    var prompt = task === 'persona' 
-      ? `${systemInstruction}\n\n[미션] 회의록 내 발언 의원 **전수(100%)** 분석하여 의원별 상세 리포트 도출 (단 한 명의 누락도 허용하지 않음!)\n(JSON 형식: {"personas": [{"의원명": "...", "지역구": "...", "주요 관심사": "...", "질문 성향": "...", "예상 감사 포인트": "...", "발언요약": "..."}]})\n\n[데이터 원본]\n${aggregatedText}`
-      : `${systemInstruction}\n\n[미션] 보고서 전수 분석하여 예상질문 생성\n(JSON 형식: {"questions": [{"분류": "...", "의원명": "...", "질문": "...", "답변 가이드": "..."}]})\n\n[데이터 원본]\n${aggregatedText}`;
+[데이터]
+1. 뉴스 원문(요약): ${newsData}
+2. 추출 리스크: (Step 1) ${risk1} / (Step 2) ${risk2}
+3. 의원 성향 메타데이터: ${personas}
+4. 업무보고 자료 원문 (Context): ${sourceTexts}
 
-    // [디버그 로그] 시트에 추출된 텍스트 기록 (추후 확인용)
-    try {
-      const debugSheet = getOrCreateSheet(ss, 'Debug_Log');
-      debugSheet.clearContents().appendRow(['시간', '추출된 텍스트 샘플(5000자)']);
-      
-      const textToLog = String(aggregatedText || "추출된 텍스트가 없습니다.");
-      const sampleText = textToLog.length > 5000 
-        ? textToLog.substring(0, 2500) + "\n\n... (중략) ...\n\n" + textToLog.substring(textToLog.length - 2500)
-        : textToLog;
-      debugSheet.appendRow([new Date(), sampleText]);
-    } catch(e) {
-      console.error("로깅 오류:", e);
+(JSON 형식: {"questions": [{"분류": "...", "의원명": "...", "질문": "...", "답변 가이드": "..."}]})`;
+    aggregatedText = sourceTexts; // For logging
+  } else if (task === 'persona') {
+    const folder = getSubFolder(parent, 'minutes');
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      const blob = f.getBlob();
+      if (blob.getContentType() === "application/pdf") {
+        contents.parts.push({ inlineData: { data: Utilities.base64Encode(blob.getBytes()), mimeType: "application/pdf" } });
+        aggregatedText += `\n[회의록] ${f.getName()} (PDF)`;
+      } else {
+        const txt = blob.getDataAsString();
+        contents.parts.push({ text: `\n[회의록] ${f.getName()}\n${txt}\n` });
+        aggregatedText += txt;
+      }
     }
+    if (contents.parts.length === 0) return { ok: false, error: "분석할 회의록 파일이 없습니다." };
+    prompt = `당신은 행정사무감사 전문 분석 AI입니다. 의원별 상세 성향 리포트를 작성하세요.
+(JSON 형식: {"personas": [{"의원명": "...", "지역구": "...", "주요 관심사": "...", "질문 성향": "...", "예상 감사 포인트": "...", "발언요약": "..."}]})
+
+[데이터 원본]
+${aggregatedText}`;
   }
+
+  // [디버그 로그]
+  try {
+    const debugSheet = getOrCreateSheet(ss, 'Debug_Log');
+    debugSheet.clearContents().appendRow(['시간', '추출된 텍스트 샘플(5000자)']);
+    const textToLog = String(aggregatedText || "추출된 텍스트가 없거나 멀티모달 파일만 전송됨.");
+    const sampleText = textToLog.length > 5000 
+      ? textToLog.substring(0, 2500) + "\n\n... (중략) ...\n\n" + textToLog.substring(textToLog.length - 2500)
+      : textToLog;
+    debugSheet.appendRow([new Date(), sampleText]);
+  } catch(e) {}
 
   // 3. API 호출
   try {
