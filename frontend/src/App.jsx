@@ -351,7 +351,7 @@ function App() {
                 <UserCheck size={18} /> <span>의원 관심사</span>
               </button>
               <button className={activeTab === 'risks' ? 'active' : ''} onClick={() => setActiveTab('risks')}>
-                <ShieldAlert size={18} /> <span>이슈/리스크</span>
+                <ShieldAlert size={18} /> <span>주요 뉴스</span>
               </button>
               <button className={activeTab === 'questions' ? 'active' : ''} onClick={() => setActiveTab('questions')}>
                 <MessageSquare size={18} /> <span>예상 질문</span>
@@ -559,7 +559,7 @@ function App() {
                             if (!item) return false;
                             const fullDate = item.날짜 || item.date || "";
                             if (filterMonth !== 'all' && !fullDate.startsWith(filterMonth)) return false;
-                            
+
                             const title = item.제목 || item.title || "";
                             const summary = item.AI요약 || item.aiSummary || item.naverDesc || "";
                             const category = item.분야 || item.category || item.주제 || ""; // '분야' 우선
@@ -627,7 +627,7 @@ function App() {
               <div className="section-header">
                 <div className="title-row">
                   <HelpCircle size={24} className="title-icon" />
-                  <h2>행정감사 상정 질문 및 대응</h2>
+                  <h2>리스크 분석 및 예상 질문</h2>
                 </div>
                 <div className="btn-group">
                   <button className="action-btn secondary" onClick={() => handleAction('risks')}>
@@ -642,7 +642,7 @@ function App() {
               <div className="analysis-pipeline-info">
                 <div className="info-txt">
                   <AlertTriangle size={16} className="text-warning" />
-                  <span>"최근 뉴스" 데이터를 기반으로 <b>리스크</b>를 먼저 추출한 뒤, 최종 <b>예상 질문</b>을 생성하십시오.</span>
+                  <span>"주요 뉴스" 데이터를 기반으로 <b>리스크 추출</b>을 먼저 실행한 뒤, 최종 <b>예상 질문</b>을 생성하십시오.</span>
                 </div>
               </div>
 
@@ -650,7 +650,7 @@ function App() {
                 <div className="analysis-step">
                   <div className="step-header">
                     <div className="step-num">Step 1</div>
-                    <h3>분석된 리스크 요인 ({risks.length}건)</h3>
+                    <h3>분석된 리스크 요인 (총 {risks.length}건)</h3>
                   </div>
                   {risks.length === 0 ? (
                     <div className="empty-state-card">

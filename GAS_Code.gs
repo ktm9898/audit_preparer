@@ -37,10 +37,10 @@ function doGet(e) {
       const sheets = ss.getSheets().map(s => s.getName());
       return createResponse({
         personas: getTabData(ss, '의원별 관심사'),
-        risks: getTabData(ss, '리스크 요인'),
+        risks: getTabData(ss, '리스크 추출'),
         questions: getTabData(ss, '예상 질문'),
-        news: getTabData(ss, '최근 뉴스'),
-        news_count: Math.max(0, getTabRowCount(ss, '최근 뉴스') - 1),
+        news: getTabData(ss, '주요 뉴스'),
+        news_count: Math.max(0, getTabRowCount(ss, '주요 뉴스') - 1),
         debug: { availableSheets: sheets }
       });
     }
@@ -307,7 +307,7 @@ function fetchNewsFromNaver(targetMonth) {
   // (3) 시트 데이터 일괄 저장 (Bulk Insert)
   if (resultNews.length > 0) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = getOrCreateSheet(ss, '최근 뉴스');
+    const sheet = getOrCreateSheet(ss, '주요 뉴스');
     const rows = resultNews.map(n => [
       n.date, 
       n.category || "-", 
@@ -551,10 +551,10 @@ function runAIAnalysis(task, fileId) {
   const contents = { parts: [] };
 
   if (task === 'risks') {
-    const newsSheet = getOrCreateSheet(ss, '최근 뉴스');
+    const newsSheet = getOrCreateSheet(ss, '주요 뉴스');
     const context = newsSheet.getDataRange().getValues().slice(1).map(r => `[${r[0]}] ${r[2]}: ${r[3]}`).join("\n");
     var prompt = `[지시사항] 반드시 제공된 뉴스 데이터에 기반하여 리스크를 도출하세요. 없는 사실을 지어내지 마세요.
-[미션] 서울신용보증재단 뉴스 데이터를 바탕으로 행정감사 리스크 쟁점 10개를 도출하세요. 
+[미션] 서울신용보증재단 뉴스 데이터를 바탕으로 행정감사 리스크 쟁점 20개를 도출하세요. 
 (JSON 형식: {"risks": [{"리스크 요인": "...", "세부 내용": "...", "관련 근거": "..."}]})
 
 데이터:
@@ -683,7 +683,7 @@ ${context}`;
     
     // 4. 시트 기록
     if (task === 'risks') {
-      const sheet = getOrCreateSheet(ss, '리스크 요인');
+      const sheet = getOrCreateSheet(ss, '리스크 추출');
       sheet.clearContents().appendRow(['리스크 요인', '세부 내용', '관련 근거', '마지막 업데이트']);
       const risks = result.risks || result.data || [];
       risks.forEach(r => sheet.appendRow([r['리스크 요인'] || r['요인'], r['세부 내용'] || r['내용'], r['관련 근거'] || r['근거'], now]));
