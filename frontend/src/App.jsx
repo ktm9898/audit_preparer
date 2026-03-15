@@ -651,7 +651,7 @@ function App() {
               </div>
 
               <div className="layout-with-sidebar">
-                <div className="main-content">
+                <div className="main-content" style={{ minWidth: 0 }}>
                   <div className="analysis-pipeline-info">
                     <div className="info-txt">
                       <AlertTriangle size={16} className="text-warning" />
