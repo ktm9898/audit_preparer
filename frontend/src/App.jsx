@@ -394,18 +394,18 @@ function App() {
                   onClick={() => setActiveTab('personas')}
                 />
                 <StatCard
-                  title="분석된 리스크 요인"
-                  value={`${risks1.length + risks2.length}건`}
-                  icon={ShieldAlert}
-                  color="red"
-                  onClick={() => setActiveTab('questions')}
-                />
-                <StatCard
                   title="수집된 관련 뉴스"
                   value={`${newsCount}건`}
                   icon={Newspaper}
                   color="green"
                   onClick={() => setActiveTab('risks')}
+                />
+                <StatCard
+                  title="분석된 리스크 요인"
+                  value={`${risks1.length + risks2.length}건`}
+                  icon={ShieldAlert}
+                  color="red"
+                  onClick={() => setActiveTab('questions')}
                 />
                 <StatCard
                   title="최종 대비 예상 질문"
