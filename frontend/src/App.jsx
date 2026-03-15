@@ -61,13 +61,15 @@ const StatCard = ({ title, value, icon: Icon, color, onClick }) => (
 
 function App() {
   const [personas, setPersonas] = useState([]);
-  const [risks, setRisks] = useState([]);
+  const [risks1, setRisks1] = useState([]);
+  const [risks2, setRisks2] = useState([]);
   const [questions, setQuestions] = useState([]);
   const [news, setNews] = useState([]);
   const [newsCount, setNewsCount] = useState(0);
   const [selectedPersona, setSelectedPersona] = useState(null);
   const [selectedNews, setSelectedNews] = useState(null);
   const [minutesFiles, setMinutesFiles] = useState([]);
+  const [reportFiles, setReportFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [activeTab, setActiveTab] = useState('summary');
@@ -88,7 +90,8 @@ function App() {
     try {
       const res = await axios.get(`${API_BASE}?action=getAllData&token=${passcode}`);
       setPersonas(res.data.personas || []);
-      setRisks(res.data.risks || []);
+      setRisks1(res.data.risks1 || []);
+      setRisks2(res.data.risks2 || []);
       setQuestions(res.data.questions || []);
       setNews(res.data.news || []);
       setNewsCount(res.data.news_count || 0);
@@ -96,6 +99,9 @@ function App() {
 
       const mRes = await axios.get(`${API_BASE}?action=listFiles&type=minutes&token=${passcode}`);
       if (Array.isArray(mRes.data)) setMinutesFiles(mRes.data);
+
+      const rRes = await axios.get(`${API_BASE}?action=listFiles&type=report&token=${passcode}`);
+      if (Array.isArray(rRes.data)) setReportFiles(rRes.data);
 
       setStatus('');
     } catch (err) {
@@ -225,8 +231,9 @@ function App() {
 
         if (result.ok) {
           setStatus('업로드 성공!');
-          const res = await axios.get(`${API_BASE}?action=listFiles&type=${type}`);
+          const res = await axios.get(`${API_BASE}?action=listFiles&type=${type}&token=${passcode}`);
           if (type === 'minutes') setMinutesFiles(res.data);
+          if (type === 'report') setReportFiles(res.data);
         } else {
           throw new Error(result.error || '업로드 처리 중 서버 오류');
         }
@@ -265,6 +272,7 @@ function App() {
         setStatus('삭제 성공!');
         const res = await axios.get(`${API_BASE}?action=listFiles&type=${type}&token=${passcode}`);
         if (type === 'minutes') setMinutesFiles(res.data);
+        if (type === 'report') setReportFiles(res.data);
       } else {
         throw new Error(result.error || '삭제 중 서버 오류');
       }
@@ -387,10 +395,10 @@ function App() {
                 />
                 <StatCard
                   title="분석된 리스크 요인"
-                  value={`${risks.length}건`}
+                  value={`${risks1.length + risks2.length}건`}
                   icon={ShieldAlert}
                   color="red"
-                  onClick={() => setActiveTab('risks')}
+                  onClick={() => setActiveTab('questions')}
                 />
                 <StatCard
                   title="수집된 관련 뉴스"

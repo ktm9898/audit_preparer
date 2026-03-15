@@ -37,7 +37,8 @@ function doGet(e) {
       const sheets = ss.getSheets().map(s => s.getName());
       return createResponse({
         personas: getTabData(ss, '의원별 관심사'),
-        risks: getTabData(ss, '리스크 추출'),
+        risks1: getTabData(ss, '리스크 추출1'),
+        risks2: getTabData(ss, '리스크 추출2'),
         questions: getTabData(ss, '예상 질문'),
         news: getTabData(ss, '주요 뉴스'),
         news_count: Math.max(0, getTabRowCount(ss, '주요 뉴스') - 1),
@@ -559,6 +560,53 @@ function runAIAnalysis(task, fileId) {
 
 데이터:
 ${context}`;
+  } else if (task === 'report_risks') {
+    // 1. 업무보고 자료 취합
+    const folder = getSubFolder(parent, 'reports');
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      const blob = f.getBlob();
+      const mimeType = blob.getContentType();
+      if (mimeType === "application/pdf") {
+        contents.parts.push({ inlineData: { data: Utilities.base64Encode(blob.getBytes()), mimeType: "application/pdf" } });
+        aggregatedText += `\n[문서] 파일명: ${f.getName()} (PDF 원본)`;
+      } else {
+        const txt = blob.getDataAsString();
+        aggregatedText += `\n[문서] 파일명: ${f.getName()}\n${txt}\n`;
+      }
+    }
+    if (contents.parts.length === 0) return { ok: false, error: "분석할 업무보고 자료가 없습니다." };
+    
+    var prompt = `[미션] 업로드된 업무보고 자료를 분석하여 행정감사 리스크 쟁점 20개를 도출하세요.
+각 리스크는 구체적인 수치 기반이거나 실무적인 문제점을 포함해야 합니다.
+(JSON 형식: {"risks": [{"리스크 요인": "...", "세부 내용": "...", "관련 근거": "..."}]})
+
+[데이터 원본]
+${aggregatedText}`;
+  } else if (task === 'final_questions') {
+    // 1. 관련 데이터 보강 (리스크1, 리스크2, 의원 관심사)
+    const risk1 = getTabData(ss, '리스크 추출1').map(r => `- ${r['리스크 요인']}: ${r['세부 내용']}`).join("\n");
+    const risk2 = getTabData(ss, '리스크 추출2').map(r => `- ${r['리스크 요인']}: ${r['세부 내용']}`).join("\n");
+    const personas = getTabData(ss, '의원별 관심사').map(p => `- ${p['의원명']}(${p['지역구']}): 관심사[${p['주요 관심사']}], 성향[${p['질문 성향']}], 감사포인트[${p['예상 감사 포인트']}]`).join("\n");
+    
+    var prompt = `[미션] 제공된 '뉴스 기반 리스크', '업무보고 기반 리스크' 그리고 '의원별 관심사' 데이터를 종합하여 최종 행정감사 예상 질문 30개를 생성하세요.
+[지시사항]
+1. 각 의원의 관심사와 성향을 고려하여, 해당 의원이 던질만한 가장 날카로운 질문을 만드세요.
+2. 답변 가이드는 재단이 방어할 수 있는 최선의 논리를 포함해야 합니다.
+3. 질문은 구체적이어야 하며, 실무적인 수치나 사례를 언급하도록 구성하세요.
+
+[데이터]
+1. 뉴스 기반 리스크 (Step 1):
+${risk1}
+
+2. 업무보고 기반 리스크 (Step 2):
+${risk2}
+
+3. 의원별 관심사 및 성향:
+${personas}
+
+(JSON 형식: {"questions": [{"분류": "...", "의원명": "...", "질문": "...", "답변 가이드": "..."}]})`;
   } else {
     // 1. 데이터 취합 및 파일 전송 준비 (멀티모달 대응)
 
@@ -683,10 +731,20 @@ ${context}`;
     
     // 4. 시트 기록
     if (task === 'risks') {
-      const sheet = getOrCreateSheet(ss, '리스크 추출');
+      const sheet = getOrCreateSheet(ss, '리스크 추출1');
       sheet.clearContents().appendRow(['리스크 요인', '세부 내용', '관련 근거', '마지막 업데이트']);
       const risks = result.risks || result.data || [];
       risks.forEach(r => sheet.appendRow([r['리스크 요인'] || r['요인'], r['세부 내용'] || r['내용'], r['관련 근거'] || r['근거'], now]));
+    } else if (task === 'report_risks') {
+      const sheet = getOrCreateSheet(ss, '리스크 추출2');
+      sheet.clearContents().appendRow(['리스크 요인', '세부 내용', '관련 근거', '마지막 업데이트']);
+      const risks = result.risks || result.data || [];
+      risks.forEach(r => sheet.appendRow([r['리스크 요인'] || r['요인'], r['세부 내용'] || r['내용'], r['관련 근거'] || r['근거'], now]));
+    } else if (task === 'final_questions' || task === 'questions') {
+      const sheet = getOrCreateSheet(ss, '예상 질문');
+      sheet.clearContents().appendRow(['분류', '의원명', '질문', '답변 가이드', '마지막 업데이트']);
+      const questions = result.questions || result.data || [];
+      questions.forEach(q => sheet.appendRow([q['분류'], q['의원명'], q['질문'] || q['예상 질문'], q['답변 가이드'] || q['답변'], now]));
     } else if (task === 'persona') {
       const sheet = getOrCreateSheet(ss, '의원별 관심사');
       sheet.clearContents().appendRow(['의원명', '지역구', '주요 관심사', '발언 요약', '질문 성향', '예상 감사 포인트', '마지막 업데이트']);
