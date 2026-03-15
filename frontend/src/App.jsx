@@ -1368,12 +1368,15 @@ function App() {
 
         /* Premium Table Styles */
         .premium-shadow { box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02); }
-        .news-table-container { background: white; border-radius: 1.25rem; border: 1px solid var(--border); overflow: hidden; margin-top: 1.5rem; }
+        .news-table-container, .questions-table-container { 
+          background: white; border-radius: 1.25rem; border: 1px solid var(--border); 
+          overflow: hidden; margin-top: 1.5rem; 
+        }
         .table-responsive { overflow-x: auto; }
         .premium-table { width: 100%; border-collapse: collapse; text-align: left; }
         .premium-table th { 
-          background: #f8fafc; padding: 1.25rem 1rem; font-size: 0.8rem; font-weight: 800; color: var(--text-muted);
-          border-bottom: 2px solid var(--border); text-transform: uppercase; letter-spacing: 0.025em;
+          background: #f1f5f9; padding: 1.25rem 1rem; font-size: 0.8rem; font-weight: 800; color: #475569;
+          border-bottom: 2px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.025em;
         }
         .premium-table td { padding: 1.5rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
         .premium-table tr:last-child td { border-bottom: none; }
@@ -1428,6 +1431,13 @@ function App() {
         }
         .icon-link-circle:hover { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
         .empty-row { padding: 4rem 0; text-align: center; color: var(--text-muted); font-size: 0.9rem; }
+
+        .q-text-cell, .a-text-cell { 
+          font-size: 0.95rem; line-height: 1.6; color: #1e293b; white-space: pre-wrap;
+          max-width: 500px;
+        }
+        .q-text-cell { font-weight: 700; color: var(--text); }
+        .a-text-cell { color: #334155; }
 
         /* Pipeline Styles */
         .analysis-pipeline-info { background: #fffbeb; border: 1px solid #fef3c7; padding: 0.75rem 1.25rem; border-radius: 0.75rem; margin-bottom: 2rem; }
