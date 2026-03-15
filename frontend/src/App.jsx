@@ -417,10 +417,35 @@ function App() {
               </div>
 
               <div className="dashboard-footer">
+                <div className="section-divider">
+                  <div className="divider-line"></div>
+                  <span className="divider-text">자료파일 업로드</span>
+                  <div className="divider-line"></div>
+                </div>
+                
+                <div className="file-management-hub">
+                  <div className="fm-hub-grid">
+                    <MiniFileManager
+                      files={minutesFiles}
+                      type="minutes"
+                      label="시의회 회의록"
+                      onUpload={handleFileUpload}
+                      onDelete={handleDeleteFile}
+                    />
+                    <MiniFileManager
+                      files={reportFiles}
+                      type="report"
+                      label="재단 업무보고"
+                      onUpload={handleFileUpload}
+                      onDelete={handleDeleteFile}
+                    />
+                  </div>
+                </div>
+
                 <div className="system-status">
                   <div className="status-dot"></div>
                   <span>시스템 정상 작동 중</span>
-                  <span className="update-time">마지막 업데이트: {new Date().toLocaleTimeString()}</span>
+                  <span className="update-time">마지막 업데이트: {new Date().toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -438,7 +463,7 @@ function App() {
                 </button>
               </div>
 
-              <div className="layout-with-sidebar">
+              <div className="layout-full-width">
                 <div className="main-content">
                   <div className="card-grid">
                     {personas.map((p, i) => (
@@ -477,15 +502,6 @@ function App() {
                     <div className="empty-state">데이터가 없습니다. 분석을 실행해 주세요.</div>
                   )}
                 </div>
-                <aside className="sidebar">
-                  <MiniFileManager
-                    files={minutesFiles}
-                    type="minutes"
-                    label="시의회 회의록"
-                    onUpload={handleFileUpload}
-                    onDelete={handleDeleteFile}
-                  />
-                </aside>
               </div>
             </div>
           )}
@@ -650,7 +666,7 @@ function App() {
                 </div>
               </div>
 
-              <div className="layout-with-sidebar">
+              <div className="layout-full-width">
                 <div className="main-content" style={{ minWidth: 0 }}>
                   <div className="analysis-pipeline-info">
                     <div className="info-txt">
@@ -742,16 +758,6 @@ function App() {
                     </div>
                   </div>
                 </div>
-
-                <aside className="sidebar">
-                  <MiniFileManager
-                    files={reportFiles}
-                    type="report"
-                    label="업무보고 자료"
-                    onUpload={handleFileUpload}
-                    onDelete={handleDeleteFile}
-                  />
-                </aside>
               </div>
             </div>
           )}
@@ -886,6 +892,11 @@ function App() {
           animation: modalSlideUp 0.3s ease-out;
           position: relative; border: 1px solid rgba(0,0,0,0.1);
         }
+        .layout-with-sidebar { display: grid; grid-template-columns: 1fr 320px; gap: 2rem; align-items: start; }
+        .layout-full-width { width: 100%; }
+        .main-content { min-width: 0; }
+        .sidebar { position: sticky; top: 100px; }
+
         .main-header {
           position: fixed; top: 0; left: 0; right: 0;
           background: rgba(255, 255, 255, 0.9);
@@ -1020,13 +1031,41 @@ function App() {
         .stat-card:hover .stat-arrow { transform: translateX(3px); color: var(--primary); }
 
         .dashboard-footer { 
-          margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); 
+          margin-top: 4rem; padding-top: 1rem; border-top: 1px solid var(--border); 
         }
-        .system-status { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: var(--text-muted); }
+
+        /* Dashboard 자료파일 업로드 섹션 */
+        .section-divider { display: flex; align-items: center; gap: 1rem; margin: 3rem 0 2rem; opacity: 0.6; }
+        .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, #cbd5e1, transparent); }
+        .divider-text { font-size: 0.85rem; font-weight: 700; color: #64748b; letter-spacing: 0.05em; }
+        
+        .file-management-hub { 
+          background: white; border-radius: 1.5rem; padding: 2rem; 
+          border: 1px solid #f1f5f9; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); 
+          margin-bottom: 3rem; 
+        }
+        .fm-hub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+
+        .mini-fm { background: #f8fafc; border-radius: 1.25rem; padding: 1.5rem; border: 1px solid #e2e8f0; }
+        .mf-header { 
+          display: flex; justify-content: space-between; align-items: center; 
+          margin-bottom: 1.25rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; 
+        }
+        .mf-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; color: var(--text); }
+        .mf-add { 
+          cursor: pointer; display: flex; align-items: center; gap: 0.4rem; 
+          font-size: 0.8rem; font-weight: 700; color: var(--primary); 
+          background: white; padding: 0.4rem 0.75rem; border-radius: 0.5rem; border: 1px solid var(--primary);
+          transition: all 0.2s;
+        }
+        .mf-add:hover { background: var(--primary); color: white; }
+        .mf-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto; }
+        
+        .system-status { display: flex; align-items: center; gap: 0.75rem; font-size: 0.85rem; color: var(--text-muted); padding: 1rem 0; }
         .status-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 10px var(--success); }
         .update-time { margin-left: auto; }
 
-        /* Tab Views */
+        /* Tab Views & Layouts */
         .section-header {
           display: flex; justify-content: space-between; align-items: flex-end;
           margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--border);
@@ -1034,8 +1073,8 @@ function App() {
         .title-row { display: flex; align-items: center; gap: 0.75rem; }
         .title-icon { color: var(--primary); }
         .section-header h2 { font-size: 1.5rem; font-weight: 800; margin: 0; }
-        
         .layout-with-sidebar { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; }
+        .layout-full-width { width: 100%; }
         .sidebar { position: sticky; top: 6.5rem; height: fit-content; }
 
         .action-btn {
@@ -1111,39 +1150,38 @@ function App() {
         .q-box .txt { font-size: 1.1rem; font-weight: 700; line-height: 1.5; }
         .a-box .txt { font-size: 1rem; color: #334155; line-height: 1.7; }
 
-        /* File Manager Sidebar */
-        .mini-fm {
-          background: white; border: 1px solid var(--border);
-          border-radius: 1.25rem; padding: 1.25rem; shadow: var(--shadow);
+        /* Dashboard & File Hub */
+        .section-divider { display: flex; align-items: center; gap: 1rem; margin: 3rem 0 2rem; opacity: 0.6; }
+        .divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, #cbd5e1, transparent); }
+        .divider-text { font-size: 0.85rem; font-weight: 600; color: #64748b; letter-spacing: 0.05em; text-transform: uppercase; }
+        
+        .file-management-hub { background: white; border-radius: 1.5rem; padding: 2rem; border: 1px solid #f1f5f9; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); margin-bottom: 2rem; }
+        .fm-hub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+
+        .mini-fm { background: #f8fafc; border-radius: 1rem; padding: 1.25rem; border: 1px solid #e2e8f0; }
+        .mf-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; }
+        .mf-title { display: flex; align-items: center; gap: 0.5rem; color: #475569; font-weight: 700; font-size: 0.9rem; }
+        .mf-add { 
+          display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem;
+          background: white; border: 1px solid #e2e8f0; border-radius: 0.5rem;
+          font-size: 0.75rem; font-weight: 600; cursor: pointer; color: #1e293b;
+          transition: all 0.2s;
         }
-        .mf-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
-        .mf-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; font-size: 0.95rem; }
-        .mf-add {
-          display: flex; align-items: center; gap: 0.3rem;
-          background: var(--primary-light); color: var(--primary);
-          padding: 0.4rem 0.75rem; border-radius: 0.5rem;
-          font-size: 0.75rem; font-weight: 800; cursor: pointer;
-        }
-        .mf-list { display: flex; flex-direction: column; gap: 0.5rem; }
+        .mf-add:hover { border-color: var(--primary); color: var(--primary); }
+        .mf-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 200px; overflow-y: auto; padding-right: 0.5rem; }
+        .mf-list::-webkit-scrollbar { width: 4px; }
+        .mf-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
         .mf-item { 
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 0.6rem 0.75rem; background: #f8fafc; border-radius: 0.5rem;
-          font-size: 0.85rem; border: 1px solid transparent; transition: all 0.2s;
+          display: flex; justify-content: space-between; align-items: center; 
+          padding: 0.5rem 0.75rem; background: white; border: 1px solid #f1f5f9; border-radius: 0.4rem;
         }
-        .mf-item:hover { border-color: var(--border); background: white; box-shadow: var(--shadow); }
-        .mf-item .item-info { display: flex; align-items: center; gap: 0.6rem; overflow: hidden; }
-        .mf-item .icon-doc { color: var(--text-muted); flex-shrink: 0; }
-        .mf-item .name { 
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-          font-weight: 500; color: var(--text);
-        }
-        .del-btn {
-          background: none; border: none; cursor: pointer; color: var(--text-muted);
-          padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center;
-          transition: all 0.2s; flex-shrink: 0;
-        }
-        .del-btn:hover { background: #fee2e2; color: var(--danger); }
-        .mf-empty { text-align: center; padding: 2rem 0; font-size: 0.85rem; color: var(--text-muted); font-style: italic; }
+        .mf-item .item-info { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+        .mf-item .name { font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #334155; }
+        .mf-item .del-btn { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 0.2rem; transition: color 0.2s; }
+        .mf-item .del-btn:hover { color: var(--danger); }
+        .mf-empty { font-size: 0.75rem; color: #94a3b8; text-align: center; padding: 1rem 0; }
+        .icon-doc { color: var(--primary); }
 
         /* Utils */
         .empty-state {
