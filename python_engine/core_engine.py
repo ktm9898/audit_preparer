@@ -235,6 +235,18 @@ def main():
     
     task = args.task or "news"
     
+    # 필수 환경 변수 체크 (GitHub Actions 실행 시 진단용)
+    missing_vars = []
+    if not NAVER_CLIENT_ID: missing_vars.append("NAVER_CLIENT_ID")
+    if not NAVER_CLIENT_SECRET: missing_vars.append("NAVER_CLIENT_SECRET")
+    if not GEMINI_API_KEY: missing_vars.append("GEMINI_API_KEY")
+    if not GOOGLE_SHEET_ID: missing_vars.append("GOOGLE_SHEET_ID")
+    
+    if missing_vars:
+        logger.error(f"❌ 필수 환경 변수 누락: {', '.join(missing_vars)}")
+        logger.error("GitHub Secrets 설정을 확인해 주세요.")
+        return
+    
     if task == "news":
         logger.info(f"🚀 [뉴스 수집] 시작: {SEARCH_QUERY} (월: {args.month})")
         raw_news = collector.fetch_news(SEARCH_QUERY)
@@ -252,8 +264,10 @@ def main():
             raw_news = filtered
         
         if not raw_news:
-            logger.warning("수집된 뉴스가 없습니다.")
+            logger.warning(f"⚠️ 검색 결과가 0건입니다. (쿼리: {SEARCH_QUERY}, 월: {args.month})")
             return
+
+        logger.info(f"✅ {len(raw_news)}건의 뉴스 검색 완료. AI 분석 시작...")
 
         logger.info(f"📊 [Stage 1] AI 지능형 선별 중...")
         screened_news = analyzer.screen_importance_with_ai(raw_news)

@@ -40,7 +40,8 @@ class SheetsSync:
                 worksheet = sh.worksheet("주요 뉴스")
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title="주요 뉴스", rows="100", cols="20")
-                worksheet.append_row(['날짜', '카테고리', '언론사', '제목', '네이버 요약', '본문 전문', '링크', 'AI 요약', '중요도'])
+                # GAS 규격 헤더: [pubDate, source, title, summary, importance, category, link, updateTime]
+                worksheet.append_row(['날짜', '언론사', '제목', 'AI요약', '중요도', '분야', '링크', '마지막 업데이트'])
 
             # 데이터 변환 (GAS 규격에 맞춤)
             rows = []
@@ -49,15 +50,14 @@ class SheetsSync:
             
             for item in news_data:
                 rows.append([
-                    today, # 날짜
-                    item.get("category", "-"),
-                    "뉴스", # 언론사 (Naver API에서 추출 가능하지만 일단 '뉴스'로 고정하거나 확장 가능)
-                    item.get("title", ""),
-                    item.get("description", ""),
-                    item.get("full_text", ""),
-                    item.get("link", ""),
-                    item.get("ai_summary", ""),
-                    item.get("importance", "-")
+                    item.get("pubDate", today), # 날짜 (네이버 제공 날짜 우선)
+                    item.get("source", "뉴스"),  # 언론사
+                    item.get("title", ""),      # 제목
+                    item.get("ai_summary", item.get("description", "")), # 요약 (AI요약 우선)
+                    item.get("importance", "-"), # 중요도
+                    item.get("category", "-"),   # 분야
+                    item.get("link", ""),        # 링크
+                    today                        # 마지막 업데이트 (현재 시간)
                 ])
             
             # 시트의 맨 아래에 추가
