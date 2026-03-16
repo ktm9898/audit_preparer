@@ -58,6 +58,16 @@ class SheetsSync:
                 # GAS 규격 헤더: [pubDate, source, title, summary, importance, category, link, updateTime]
                 worksheet.append_row(['날짜', '언론사', '제목', 'AI요약', '중요도', '분야', '링크', '마지막 업데이트'])
 
+            # 데이터 변환 (GAS 규격에 맞춤)
+            rows = []
+            import datetime
+            today = datetime.datetime.now().strftime("%Y.%m.%d")
+            
+            # 데이터 변환 (GAS 규격에 맞춤)
+            rows = []
+            import datetime
+            today = datetime.datetime.now().strftime("%Y.%m.%d")
+            
             for item in news_data:
                 # 사용자 예시 기반 순서: [날짜(A), 구분/중요도(B), 언론사(C), 제목(D), 요약(E), 링크(F), 업데이트시간(G)]
                 rows.append([

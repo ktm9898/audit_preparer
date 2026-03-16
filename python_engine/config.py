@@ -18,4 +18,4 @@ SEARCH_QUERY = "서울신용보증재단"
 MAX_NEWS_COUNT = 15
 
 # Gemini Settings
-GEMINI_MODEL = "gemini-2.0-flash" # 또는 사용자 선호 모델
+GEMINI_MODEL = "gemini-3-flash-preview" # 사용자 요청 최신 모델
