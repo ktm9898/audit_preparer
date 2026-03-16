@@ -357,23 +357,73 @@ function crawlNewsParallel(newsList) {
   console.log(`${requests.length}개 링크 동시 크롤링 중...`);
   const responses = UrlFetchApp.fetchAll(requests);
 
-  // 3. 결과 매핑 및 AI 본문 추출
+  // 3. 결과 매핑 및 본문 추출 (비-AI 휴리스틱 적용)
   return newsList.map((item, i) => {
     try {
       const resp = responses[i];
       if (resp.getResponseCode() === 200) {
         let html = resp.getContentText();
-        html = html.replace(/<(script|style|nav|header|footer|iframe|svg|aside)[^>]*>([\s\S]*?)<\/\1>/gi, '');
-        const extracted = extractTextWithAI(html, API_KEY, item.title, item.link);
+        const extracted = extractTextHeuristic(html, item.link);
         if (extracted) {
           item.fullText = extracted;
         }
       }
     } catch (e) {
-      console.warn(`크롤링 실패: ${item.title}`);
+      console.warn(`크롤링 실패: ${item.title} (${e.message})`);
     }
     return item;
   });
+}
+
+/**
+ * 비-AI 기반 뉴스 본문 추출 (휴리스틱)
+ * @param {string} html 원본 HTML
+ * @param {string} url 뉴스 URL
+ * @return {string} 추출된 본문 텍스트
+ */
+function extractTextHeuristic(html, url) {
+  if (!html) return "";
+
+  // 1. 불필요한 태그 제거 (스크립트, 스타일, 네비게이션 등)
+  let cleanHtml = html.replace(/<(script|style|nav|header|footer|iframe|svg|aside|button|input|form)[^>]*>([\s\S]*?)<\/\1>/gi, '');
+
+  // 2. 네이버 뉴스 전용 처리 (가장 높은 정확도)
+  if (url.includes('news.naver.com')) {
+    // 본문 영역 후보군
+    const selectors = [
+      /id="dic_area">([\s\S]*?)<\/div>/,
+      /id="articleBody">([\s\S]*?)<\/div>/,
+      /id="articeBody">([\s\S]*?)<\/div>/,
+      /class="article_body">([\s\S]*?)<\/div>/
+    ];
+
+    for (const regex of selectors) {
+      const match = cleanHtml.match(regex);
+      if (match && match[1]) {
+        return cleanTextContent(match[1]);
+      }
+    }
+  }
+
+  // 3. 일반 사이트용 휴리스틱 (많은 텍스트가 포함된 태그 찾기)
+  // 단순화를 위해 모든 HTML 태그를 제거하고 텍스트만 추출한 뒤 정제
+  return cleanTextContent(cleanHtml);
+}
+
+/**
+ * HTML 태그 제거 및 텍스트 정제
+ */
+function cleanTextContent(htmlSegment) {
+  return htmlSegment
+    .replace(/<[^>]+>/g, ' ') // 태그 제거
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ') // 공백 정규화
+    .trim()
+    .substring(0, 30000); // AI 분석용 길이 제한
 }
 
 // --- 1단계: AI 뉴스 스크리닝 (제목/요약 기반) ---
@@ -511,35 +561,6 @@ ${batchData}`;
 
 // 기존 deepAnalyzeNewsWithAI 삭제 (배치로 대체됨)
 
-function extractTextWithAI(textContext, apiKey, title, url) {
-  if (!apiKey || !textContext) return null;
-  // 정제된 텍스트에서 본문 추출 (페이로드 확보 위해 최대 40,000자)
-  const slicedContext = textContext.length > 40000 ? textContext.substring(0, 40000) : textContext;
-  const prompt = `뉴스 제목: ${title}\nURL: ${url}\n\n[지시사항]\n제공된 텍스트 데이터에서 기사의 "핵심 본문 전문"만 추출하세요.\n광고, 메뉴, 관련뉴스 목록 등 불필요한 정보는 모두 배제하고 기사 내용만 깨끗하게 응답하세요.\n만약 본문이 없다면 기사의 핵심 내용을 300자 내외로 요약해서 응답하세요.\n\n[데이터]\n${slicedContext}`;
-
-  try {
-    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
-    const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const resp = UrlFetchApp.fetch(apiURL, { 
-      method: "POST", 
-      contentType: "application/json", 
-      payload: JSON.stringify(payload), 
-      muteHttpExceptions: true 
-    });
-    
-    if (resp.getResponseCode() === 200) {
-      const content = JSON.parse(resp.getContentText());
-      if (content.candidates && content.candidates[0].content && content.candidates[0].content.parts) {
-        const extracted = content.candidates[0].content.parts[0].text.trim();
-        if (extracted.length > 20) return extracted;
-      }
-    }
-    return null;
-  } catch (e) { 
-    console.error(`추출 AI 오류: ${e.message}`);
-    return null; 
-  }
-}
 function runAIAnalysis(task, fileId) {
   const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
   const ss = SpreadsheetApp.getActiveSpreadsheet();
