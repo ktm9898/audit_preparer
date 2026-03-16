@@ -1,0 +1,21 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# API Keys
+NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
+NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# Google Sheets
+GOOGLE_SHEET_ID = os.environ.get("GOOGLE_SHEET_ID")
+# service_account.json 경로 또는 JSON 문자열
+GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+
+# Search Settings
+SEARCH_QUERY = "서울신용보증재단"
+MAX_NEWS_COUNT = 15
+
+# Gemini Settings
+GEMINI_MODEL = "gemini-2.0-flash" # 또는 사용자 선호 모델
