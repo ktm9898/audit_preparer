@@ -296,13 +296,13 @@ function fetchNewsFromNaver(targetMonth) {
     })
     .slice(0, 15);
 
-  // [Stage 2, 3, 4] 고성능 병렬/배치 처리 (정면 돌파)
-  console.log(`[시작] ${finalTop15.length}건 병렬 크롤링 및 배치 분석 개시...`);
-  
-  // (1) 병렬 크롤링 (fetchAll 사용)
+  // 3. 본문 수집 및 분석 (AI 호출 최소화 전략)
+  // (1) 병렬 크롤링 (코드 기반 추출로 AI 호출 0회)
+  console.log(`[크롤링] ${finalTop15.length}건 기사 본문을 코드로 추출합니다...`);
   const crawledNews = crawlNewsParallel(finalTop15);
   
-  // (2) 배치 전용 심층 분석 (단 1회의 AI 호출)
+  // (2) 배치 심층 분석 (단 1회의 AI 호출로 15건 동시 처리)
+  console.log(`[분석] Gemini를 통해 15건의 기사를 일괄 요약/분석합니다...`);
   const resultNews = deepAnalyzeNewsBatch(crawledNews, API_KEY);
 
   // (3) 시트 데이터 일괄 저장 (Bulk Insert)
@@ -321,7 +321,7 @@ function fetchNewsFromNaver(targetMonth) {
       n.importance || "-"
     ]);
     sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
-    console.log(`[완료] 총 ${resultNews.length}건이 성공적으로 저장되었습니다.`);
+    console.log(`[완료] 총 ${resultNews.length}건 저장 완료.`);
   }
 
   return { ok: true, count: resultNews.length };
@@ -341,10 +341,8 @@ function cleanTextForAI(text) {
 
 // --- 3단계: 병렬 크롤링 엔진 ---
 function crawlNewsParallel(newsList) {
-  const API_KEY = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
   
-  // 1. 요청 배열 생성
   const requests = newsList.map(item => ({
     url: item.link,
     method: "GET",
@@ -353,24 +351,25 @@ function crawlNewsParallel(newsList) {
     followRedirects: true
   }));
 
-  // 2. [핵심] 병렬 실행 (fetchAll)
-  console.log(`${requests.length}개 링크 동시 크롤링 중...`);
+  console.log(`${requests.length}개 링크 동시 연결 중...`);
   const responses = UrlFetchApp.fetchAll(requests);
 
-  // 3. 결과 매핑 및 AI 본문 추출
   return newsList.map((item, i) => {
     try {
       const resp = responses[i];
       if (resp.getResponseCode() === 200) {
         let html = resp.getContentText();
-        html = html.replace(/<(script|style|nav|header|footer|iframe|svg|aside)[^>]*>([\s\S]*?)<\/\1>/gi, '');
-        const extracted = extractTextWithAI(html, API_KEY, item.title, item.link);
-        if (extracted) {
+        // [변경] AI 호출 대신 Regex로 본문 정적 추출
+        const extracted = extractTextByCode(html);
+        if (extracted && extracted.length > 100) {
           item.fullText = extracted;
+        } else {
+          item.fullText = item.naverDesc; // 추출 실패 시 네이버 요약 활용
         }
       }
     } catch (e) {
-      console.warn(`크롤링 실패: ${item.title}`);
+      console.warn(`수집 실패: ${item.title}`);
+      item.fullText = item.naverDesc;
     }
     return item;
   });
@@ -511,33 +510,52 @@ ${batchData}`;
 
 // 기존 deepAnalyzeNewsWithAI 삭제 (배치로 대체됨)
 
-function extractTextWithAI(textContext, apiKey, title, url) {
-  if (!apiKey || !textContext) return null;
-  // 정제된 텍스트에서 본문 추출 (페이로드 확보 위해 최대 40,000자)
-  const slicedContext = textContext.length > 40000 ? textContext.substring(0, 40000) : textContext;
-  const prompt = `뉴스 제목: ${title}\nURL: ${url}\n\n[지시사항]\n제공된 텍스트 데이터에서 기사의 "핵심 본문 전문"만 추출하세요.\n광고, 메뉴, 관련뉴스 목록 등 불필요한 정보는 모두 배제하고 기사 내용만 깨끗하게 응답하세요.\n만약 본문이 없다면 기사의 핵심 내용을 300자 내외로 요약해서 응답하세요.\n\n[데이터]\n${slicedContext}`;
-
+/**
+ * [신규] 네이버 뉴스 전용 코드 기반 본문 추출기 (AI 호출 없음)
+ */
+function extractTextByCode(html) {
+  if (!html) return "";
+  
   try {
-    const apiURL = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${apiKey}`;
-    const payload = { contents: [{ parts: [{ text: prompt }] }] };
-    const resp = UrlFetchApp.fetch(apiURL, { 
-      method: "POST", 
-      contentType: "application/json", 
-      payload: JSON.stringify(payload), 
-      muteHttpExceptions: true 
-    });
-    
-    if (resp.getResponseCode() === 200) {
-      const content = JSON.parse(resp.getContentText());
-      if (content.candidates && content.candidates[0].content && content.candidates[0].content.parts) {
-        const extracted = content.candidates[0].content.parts[0].text.trim();
-        if (extracted.length > 20) return extracted;
+    // 1. 뉴스 본문 영역 매칭 (네이버 뉴스의 대표적 본문 ID들)
+    const patterns = [
+      /<div id="dic_area".*?>([\s\S]*?)<\/div>/i,        // 최신 네이버 뉴스
+      /<div id="articleBodyContents".*?>([\s\S]*?)<\/div>/i, // 구형 네이버 뉴스
+      /<article.*?>([\s\S]*?)<\/article>/i,              // 일반적인 article 태그
+      /<div class="article_body".*?>([\s\S]*?)<\/div>/i   // 기타
+    ];
+
+    let content = "";
+    for (const p of patterns) {
+      const match = html.match(p);
+      if (match && match[1]) {
+        content = match[1];
+        break;
       }
     }
-    return null;
-  } catch (e) { 
-    console.error(`추출 AI 오류: ${e.message}`);
-    return null; 
+
+    if (!content) return "";
+
+    // 2. 불필요한 태그 및 요소 정제
+    content = content
+      .replace(/<(script|style|nav|header|footer|iframe|svg|aside|button)[^>]*>([\s\S]*?)<\/\1>/gi, '') // UI 요소 제거
+      .replace(/<br\s*\/?>/gi, '\n') // 줄바꿈 보존
+      .replace(/<[^>]+>/g, ' ')      // 모든 HTML 태그 제거
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')          // 연속 공백 제거
+      .trim();
+
+    // 3. 기사 끝부분 주석 및 광고성 문구 제거 (기본적 처리)
+    content = content.split('▶')[0].split('ⓒ')[0].split('무단 전재')[0];
+
+    return content;
+  } catch (e) {
+    console.error("추출 코드 오류:", e.message);
+    return "";
   }
 }
 function runAIAnalysis(task, fileId) {
