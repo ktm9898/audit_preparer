@@ -8,7 +8,15 @@ from typing import List, Dict, Tuple
 from newspaper import Article, Config
 import google.generativeai as genai
 import pandas as pd
+import nltk
 from config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, GEMINI_API_KEY, GEMINI_MODEL, SEARCH_QUERY, GOOGLE_SHEET_ID
+
+# --- NLTK 리소스 사전 로드 (GitHub Actions 등 환경 대응) ---
+try:
+    nltk.download('punkt', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
+except Exception as e:
+    print(f"NLTK Download Warning: {e}")
 from sheets_sync import SheetsSync
 
 logger = logging.getLogger(__name__)
@@ -71,31 +79,42 @@ class NaverNewsCollector:
         except: pass
         return "뉴스"
 
-    def fetch_news(self, query: str, count: int = 100) -> List[Dict]:
-        """[복원] 기존 GAS의 페이징 및 필터링 로직 완벽 이식"""
-        url = f"https://openapi.naver.com/v1/search/news.json?query={query}&display={count}&sort=date"
-        try:
-            response = requests.get(url, headers=self.headers)
-            response.raise_for_status()
-            items = response.json().get("items", [])
-            processed = []
-            for item in items:
-                link = item.get("link")
-                if "news.naver.com" not in link:
-                    link = item.get("originallink", link)
+    def fetch_news(self, query: str, max_count: int = 1000) -> List[Dict]:
+        """네이버 API 페이징을 통해 최대 1,000건의 뉴스 수집"""
+        processed = []
+        display = 100
+        
+        # 네이버 API는 start 파라미터 최대값이 1000임
+        for start in range(1, max_count + 1, display):
+            url = f"https://openapi.naver.com/v1/search/news.json?query={query}&display={display}&start={start}&sort=date"
+            try:
+                response = requests.get(url, headers=self.headers)
+                response.raise_for_status()
+                items = response.json().get("items", [])
                 
-                if self.is_trusted_media(link):
-                    processed.append({
-                        "title": item["title"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip(),
-                        "link": link,
-                        "pubDate": item["pubDate"],
-                        "description": item["description"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip(),
-                        "source": self.get_source_name(item.get("originallink", link))
-                    })
-            return processed
-        except Exception as e:
-            logger.error(f"Naver News Fetch Error: {e}")
-            return []
+                if not items: break
+                
+                for item in items:
+                    link = item.get("link")
+                    if "news.naver.com" not in link:
+                        link = item.get("originallink", link)
+                    
+                    if self.is_trusted_media(link):
+                        processed.append({
+                            "title": item["title"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip(),
+                            "link": link,
+                            "pubDate": item["pubDate"],
+                            "description": item["description"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip(),
+                            "source": self.get_source_name(item.get("originallink", link))
+                        })
+                
+                # 너무 빠른 요청 방지
+                time.sleep(0.1)
+            except Exception as e:
+                logger.error(f"Naver News Fetch Error at start {start}: {e}")
+                break
+        
+        return processed
 
 class GeminiAnalyzer:
     def __init__(self, api_key: str):
