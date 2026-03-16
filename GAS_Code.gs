@@ -160,7 +160,8 @@ function fetchNewsFromNaver(targetMonth) {
     for (let start = 1; start <= 1000; start += displayCount) {
       if (stopSearch) break;
 
-      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(baseQuery)}&display=${displayCount}&start=${start}&sort=date`;
+      const query = `${baseQuery} ${targetMonth}`;
+      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=${displayCount}&start=${start}&sort=date`;
       try {
         const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
         if (response.getResponseCode() === 200) {
