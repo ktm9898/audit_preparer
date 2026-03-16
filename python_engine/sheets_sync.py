@@ -80,9 +80,9 @@ class SheetsSync:
                     today                        # G: 업데이트시간
                 ])
             
-            # 시트의 최상단(헤더 아래 2행)에 삽입 (최근 날짜가 위로 오도록)
-            worksheet.insert_rows(rows, 2)
-            logger.info(f"구글 시트 상단에 {len(rows)}건 저장 완료.")
+            # 시트의 맨 아래에 추가 (순차적으로 쌓임)
+            worksheet.append_rows(rows)
+            logger.info(f"구글 시트에 {len(rows)}건 저장 완료.")
         except Exception as e:
             logger.error(f"Sheets Update Error: {e}")
 

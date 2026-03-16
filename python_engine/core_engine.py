@@ -55,13 +55,19 @@ class NaverNewsCollector:
     def get_source_name(self, url: str) -> str:
         """인링크 및 원문 링크 분석을 통한 정확한 언론사 명칭 추출"""
         try:
-            # 1. 도메인 기반 검색 (가장 확실한 방법)
+            # 1. Naver News Inlink 특수 구조 처리 (인링크 우선)
+            # URL 예: https://n.news.naver.com/mnews/article/001/0015956232
+            if "news.naver.com" in url:
+                parts = url.split('/')
+                for i, part in enumerate(parts):
+                    if part == "article" and i + 1 < len(parts):
+                        aid = parts[i+1] # 언론사 ID (001 등)
+                        if aid in DOMAIN_MAP: return DOMAIN_MAP[aid]
+
+            # 2. 도메인 기반 검색 (원문 링크 등)
             domain = url.split('/')[2].replace('www.', '').replace('m.', '')
             for key, name in DOMAIN_MAP.items():
                 if key in domain: return name
-            
-            # 2. Naver News Inlink 특수 구조 처리 (예: n.news.naver.com/mnews/article/...)
-            # 이 경우 originallink를 한 번 더 체크하도록 구현되어 있음
         except: pass
         return "뉴스"
 

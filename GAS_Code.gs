@@ -195,8 +195,27 @@ function triggerGithubAction(task, payload = {}) {
 // --- 레거시 뉴스 수집 로직 -> Python 엔진 트리거로 전환 ---
 function fetchNewsFromNaver(targetMonth) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  ss.toast("Python 엔진이 깃허브에서 분석을 시작했습니다. 약 1~2분 후 시트를 확인해 주세요.", "🚀 분석 시작", 10);
-  return triggerGithubAction("news", { month: targetMonth || "" });
+  const initialCount = getTabRowCount(ss, '주요 뉴스');
+  
+  ss.toast("Python 엔진이 업무를 시작했습니다. 완료될 때까지 잠시만 기다려 주세요...", "🚀 분석 시작", 10);
+  
+  const triggerResult = triggerGithubAction("news", { month: targetMonth || "" });
+  if (!triggerResult.ok) return triggerResult;
+  
+  // Polling: 최대 5분 동안 시트 업데이트 감시 (ai_news_briefing 스타일 UX)
+  const startTime = new Date().getTime();
+  while (new Date().getTime() - startTime < 300000) { // 5분 타임아웃
+    Utilities.sleep(10000); // 10초마다 확인
+    SpreadsheetApp.flush(); // 시트 상태 강제 동기화
+    
+    const currentCount = getTabRowCount(ss, '주요 뉴스');
+    if (currentCount > initialCount) {
+      ss.toast("뉴스 수집 및 AI 분석이 성공적으로 완료되었습니다!", "✅ 완료", 5);
+      return { ok: true, message: "수집 완료" };
+    }
+  }
+  
+  return { ok: false, error: "시간 초과: 엔진 응답이 늦거나 수집된 뉴스가 없습니다. 깃허브 Actions 탭을 확인해 주세요." };
 }
 
 function runAIAnalysis(task, fileId) {
