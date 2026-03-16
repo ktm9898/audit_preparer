@@ -306,16 +306,16 @@ def main():
             logger.warning(f"⚠️ 검색 결과가 0건입니다. (쿼리: {SEARCH_QUERY}, 월: {args.month})")
             return
 
-        # [추가] 시트의 기존 데이터와 대조하여 완전 중복 제거
+        # [중요] 시트의 기존 데이터와 대조하여 이미 수집된 기사는 분석 제외 (중복 방지)
         existing_links = sync.get_existing_links()
-        deduped_news = [n for n in raw_news if n['link'] not in existing_links]
+        new_news = [n for n in raw_news if n['link'] not in existing_links]
         
-        if not deduped_news:
-            logger.info("🆕 추가할 새로운 기사가 없습니다.")
+        if not new_news:
+            logger.info("🆕 추가할 새로운 뉴스 기사가 없습니다. (이미 모두 수집됨)")
             return
 
-        logger.info(f"✅ {len(deduped_news)}건의 새로운 뉴스 분석 시작 (기존 {len(existing_links)}건 제외)")
-        raw_news = deduped_news
+        logger.info(f"✅ {len(new_news)}건의 새로운 뉴스 분석 시작 (기존 {len(existing_links)}건 중복 제외)")
+        raw_news = new_news
 
         logger.info(f"📊 [Stage 1] AI 지능형 선별 중...")
         screened_news = analyzer.screen_importance_with_ai(raw_news)
