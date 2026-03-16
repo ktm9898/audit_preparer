@@ -59,6 +59,8 @@ class SheetsSync:
     def update_news_tab(self, news_data: List[Dict]):
         """'주요 뉴스' 탭을 업데이트 (Append 방식)"""
         if not self.client: return
+        try:
+            sh = self.client.open_by_key(GOOGLE_SHEET_ID)
             try:
                 worksheet = sh.worksheet("주요 뉴스")
             except gspread.exceptions.WorksheetNotFound:
@@ -85,8 +87,6 @@ class SheetsSync:
             if rows:
                 worksheet.append_rows(rows)
                 logger.info(f"구글 시트에 {len(rows)}건 저장 완료.")
-        except Exception as e:
-            logger.error(f"Sheets Update Error: {e}")
         except Exception as e:
             logger.error(f"Sheets Update Error: {e}")
 
