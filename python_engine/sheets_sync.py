@@ -49,7 +49,8 @@ class SheetsSync:
             try:
                 worksheet = sh.worksheet("주요 뉴스")
                 worksheet.clear()
-                worksheet.append_row(['날짜', '상태', '언론사', '제목', 'AI요약', '링크', '마지막 업데이트'])
+                # UI 대응 헤더: [날짜, 중요도, 언론사, 제목, AI요약, 분야, 링크, 업데이트시간]
+                worksheet.append_row(['날짜', '중요도', '언론사', '제목', 'AI요약', '분야', '링크', '업데이트시간'])
                 logger.info("시트를 비우고 분석 준비 완료.")
             except: pass
         except Exception as e:
@@ -58,26 +59,25 @@ class SheetsSync:
     def update_news_tab(self, news_data: List[Dict]):
         """'주요 뉴스' 탭을 업데이트 (Append 방식)"""
         if not self.client: return
-        try:
-            sh = self.client.open_by_key(GOOGLE_SHEET_ID)
             try:
                 worksheet = sh.worksheet("주요 뉴스")
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title="주요 뉴스", rows="100", cols="20")
-                worksheet.append_row(['날짜', '상태', '언론사', '제목', 'AI요약', '링크', '마지막 업데이트'])
+                worksheet.append_row(['날짜', '중요도', '언론사', '제목', 'AI요약', '분야', '링크', '업데이트시간'])
 
             import datetime
             today = datetime.datetime.now().strftime("%Y.%m.%d")
             
             rows = []
             for item in news_data:
-                # [A:날짜, B:상태, C:언론사, D:제목, E:AI요약, F:링크, G:마지막 업데이트]
+                # App.jsx 필드 매핑 대응: [날짜, 중요도, 언론사, 제목, AI요약, 분야, 링크, 업데이트시간]
                 rows.append([
                     item.get("pubDate", today), 
-                    item.get("importance", "-"), 
+                    item.get("importance", "하"), 
                     item.get("source", "뉴스"), 
                     item.get("title", ""), 
                     item.get("ai_summary", item.get("description", "")), 
+                    item.get("category", "기타"),
                     item.get("link", ""), 
                     today
                 ])

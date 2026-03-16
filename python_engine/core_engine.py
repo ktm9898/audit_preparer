@@ -306,19 +306,14 @@ def main():
             logger.warning(f"⚠️ 검색 결과가 0건입니다. (쿼리: {SEARCH_QUERY}, 월: {args.month})")
             return
 
-        # [중요] 시트의 기존 데이터와 대조하여 이미 수집된 기사는 분석 제외 (중복 방지)
-        existing_links = sync.get_existing_links()
-        new_news = [n for n in raw_news if n['link'] not in existing_links]
-        
-        if not new_news:
-            logger.info("🆕 추가할 새로운 뉴스 기사가 없습니다. (이미 모두 수집됨)")
-            return
+        # [교정] '지능형 중복 제거'는 AI가 수행함 (가져온 기사들끼리 비교)
+        # 따라서 시트 링크 기반 강제 제외 로직을 제거하여 AI가 전체 맥락을 보도록 함
+        logger.info(f"✅ {len(raw_news)}건의 뉴스 검색 완료. AI 중복 제거 및 분석 시작...")
 
-        logger.info(f"✅ {len(new_news)}건의 새로운 뉴스 분석 시작 (기존 {len(existing_links)}건 중복 제외)")
-        raw_news = new_news
-
-        logger.info(f"📊 [Stage 1] AI 지능형 선별 중...")
+        logger.info(f"📊 [Stage 1] AI 지권형 중복 제거 및 선별 중...")
+        # 이 단계에서 AI가 비슷한 기사를 클러스터링하고 1개만 중요도를 높게 매깁니다.
         screened_news = analyzer.screen_importance_with_ai(raw_news)
+        
         logger.info(f"🔍 [Stage 2] 심층 분석 중...")
         final_results = analyzer.deep_analyze_news_batch(screened_news)
         sync.update_news_tab(final_results)
