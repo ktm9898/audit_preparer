@@ -5,7 +5,7 @@ import time
 import datetime
 from email.utils import parsedate_to_datetime
 from typing import List, Dict, Tuple
-from newspaper import Article
+from newspaper import Article, Config
 import google.generativeai as genai
 import pandas as pd
 from config import NAVER_CLIENT_ID, NAVER_CLIENT_SECRET, GEMINI_API_KEY, GEMINI_MODEL, SEARCH_QUERY, GOOGLE_SHEET_ID
@@ -114,10 +114,10 @@ class GeminiAnalyzer:
 제공된 뉴스 후보군({len(news_list)}건)에서 가장 가치 있는 15건을 선발하세요.
 
 [지시사항]
-1. 중복 제거 (핵심): 동일하거나 매우 유사한 사건/이슈를 다루는 기사가 여러 개라면, 가장 포괄적인 1개만 살리고 나머지는 모두 중요도를 '하'로 매기세요. (사용자가 겹치는 뉴스를 보지 않게 하는 것이 최우선입니다.)
-2. 중요도 판별: 재단 관련 정책, 소상공인 지원, 경제 지표, 의회 행정감사 관련 기사를 '상', '중', '하'로 판별하세요.
-3. 분야 분류: 각 뉴스를 '정책', '지원', '경제', '금융', '의회', '기타' 중 하나로 분류하세요.
-4. 가용성 보장 (핵심): 만약 '상'이나 '중' 등급의 기사가 부족하더라도, 후보군 중 상대적으로 나은 기사들을 골라 반드시 총 15개의 기사 인덱스를 응답하세요.
+1. 중복 제거 (핵심): 동일하거나 매우 유사한 사건/이슈를 다루는 기사가 여러 개라면, 가장 포괄적인 1개만 살리고 나머지는 모두 중요도를 '하'로 매기세요.
+2. 중요도 판별: 중요도는 반드시 '상', '중', '하' 중 하나만 사용하세요.
+3. 분야 분류 (중요): 분야는 반드시 '정책', '지원', '경제', '금융', '의회', '기타' 중 하나만 사용하세요. (중요도 '상/중/하'를 분야 칸에 넣지 마세요!)
+4. 가용성 보장: 후보군 중 가장 나은 기사들을 골라 반드시 총 15개의 기사 인덱스를 응답하세요.
 
 [응답 형식] 반드시 JSON 형식:
 {{"top15": [{{"index": 0, "importance": "상", "category": "정책"}}, ...]}}
@@ -228,33 +228,36 @@ class ArticleExtractor:
     def extract(self, url: str) -> str:
         try:
             # 1. Newspaper4k 시도
-            config = Article.config()
-            config.browser_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-            article = Article(url, language='ko', config=config)
-            article.download()
-            article.parse()
-            text = article.text.strip()
+            text = ""
+            try:
+                config = Config()
+                config.browser_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                article = Article(url, language='ko', config=config)
+                article.download()
+                article.parse()
+                text = article.text.strip()
+            except Exception as inner_e:
+                logger.warning(f"Newspaper4k Fail: {inner_e} for {url}")
             
             # 본문이 충분히 길면 성공으로 간주
             if len(text) > 400: return text
             
-            # 2. BeautifulSoup 기반 백업 (네이버 뉴스 본문 수집력 강화)
+            # 2. BeautifulSoup 기반 백업
             from bs4 import BeautifulSoup
-            headers = {"User-Agent": config.browser_user_agent}
+            headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
             resp = requests.get(url, headers=headers, timeout=10)
-            soup = BeautifulSoup(resp.content, 'html.parser')
+            soup = BeautifulSoup(resp.content, 'html.parser', from_encoding='utf-8')
             
-            # 네이버 뉴스 특화 본문 선택자들 (뉴스, 연합뉴스, 뉴스1 등 통합 대응)
+            # 네이버 뉴스 특화 본문 선택자들
             content = soup.select_one('#newsct_article') or soup.select_one('#articleBodyContents') or soup.select_one('#dic_area') or soup.select_one('#articleBody')
             if content:
-                # 불필요한 태그(광고, 버튼, 기자 정보 등) 정리
                 for tag in content.select('.article_footer, .article_info, .modify_info, .img_desc, script, style'): 
                     tag.decompose()
                 return content.get_text().strip()
             
             return text if text else ""
         except Exception as e:
-            logger.error(f"Extract Error: {e} for {url}")
+            logger.error(f"Extract Error: {str(e)} for {url}")
             return ""
 
 import argparse

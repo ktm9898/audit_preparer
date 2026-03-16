@@ -42,15 +42,15 @@ class SheetsSync:
             return []
 
     def clear_news_tab(self):
-        """분석 시작 전 '주요 뉴스' 탭을 비움 (진행 상태 표시 대용)"""
+        """분석 시작 전 '주요 뉴스' 탭을 비움 (사용자 요청에 따라 수동 실행 전용)"""
         if not self.client: return
         try:
             sh = self.client.open_by_key(GOOGLE_SHEET_ID)
             try:
                 worksheet = sh.worksheet("주요 뉴스")
                 worksheet.clear()
-                # UI 대응 헤더: [날짜, 중요도, 언론사, 제목, AI요약, 분야, 링크, 업데이트시간]
-                worksheet.append_row(['날짜', '중요도', '언론사', '제목', 'AI요약', '분야', '링크', '업데이트시간'])
+                # 사용자 정의 컬럼 순서: [날짜, 분야, 언론사, 제목, 네이버요약, 본문전문, 링크, AI요약, 중요도]
+                worksheet.append_row(['날짜', '분야', '언론사', '제목', '네이버요약', '본문전문', '링크', 'AI요약', '중요도'])
                 logger.info("시트를 비우고 분석 준비 완료.")
             except: pass
         except Exception as e:
@@ -65,23 +65,24 @@ class SheetsSync:
                 worksheet = sh.worksheet("주요 뉴스")
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title="주요 뉴스", rows="100", cols="20")
-                worksheet.append_row(['날짜', '중요도', '언론사', '제목', 'AI요약', '분야', '링크', '업데이트시간'])
+                worksheet.append_row(['날짜', '분야', '언론사', '제목', '네이버요약', '본문전문', '링크', 'AI요약', '중요도'])
 
             import datetime
             today = datetime.datetime.now().strftime("%Y.%m.%d")
             
             rows = []
             for item in news_data:
-                # App.jsx 필드 매핑 대응: [날짜, 중요도, 언론사, 제목, AI요약, 분야, 링크, 업데이트시간]
+                # 사용자 정의 컬럼 매핑: [날짜, 분야, 언론사, 제목, 네이버요약, 본문전문, 링크, AI요약, 중요도]
                 rows.append([
                     item.get("pubDate", today), 
-                    item.get("importance", "하"), 
+                    item.get("category", "기타"),
                     item.get("source", "뉴스"), 
                     item.get("title", ""), 
-                    item.get("ai_summary", item.get("description", "")), 
-                    item.get("category", "기타"),
+                    item.get("description", ""), # 네이버요약
+                    item.get("full_text", ""),    # 본문전문
                     item.get("link", ""), 
-                    today
+                    item.get("ai_summary", ""),   # AI요약
+                    item.get("importance", "하")
                 ])
             
             if rows:
