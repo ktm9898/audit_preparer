@@ -218,30 +218,60 @@ class ArticleExtractor:
             return article.text.strip()
         except: return ""
 
+import argparse
+
 def main():
+    parser = argparse.ArgumentParser(description="Audit Preparer AI Engine")
+    parser.add_argument("--task", type=str, help="Excution task: news, risks, persona, questions")
+    parser.add_argument("--month", type=str, help="Target month for news (e.g., 2024.03)", default="")
+    args = parser.parse_args()
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
     
     collector = NaverNewsCollector(NAVER_CLIENT_ID, NAVER_CLIENT_SECRET)
     analyzer = GeminiAnalyzer(GEMINI_API_KEY)
     sync = SheetsSync()
     
-    logger.info(f"🚀 [프로세스 복원] 뉴스 수집 시작: {SEARCH_QUERY}")
-    raw_news = collector.fetch_news(SEARCH_QUERY)
+    task = args.task or "news"
     
-    if not raw_news:
-        logger.warning("수집된 뉴스가 없습니다.")
-        return
+    if task == "news":
+        logger.info(f"🚀 [뉴스 수집] 시작: {SEARCH_QUERY} (월: {args.month})")
+        raw_news = collector.fetch_news(SEARCH_QUERY)
+        if args.month:
+            raw_news = [n for n in raw_news if args.month in n.get('pubDate', '')]
+        
+        if not raw_news:
+            logger.warning("수집된 뉴스가 없습니다.")
+            return
 
-    logger.info(f"📊 [Stage 1] AI 지능형 선별 및 중복 제거 중... (총 {len(raw_news)}건 후보)")
-    screened_news = analyzer.screen_importance_with_ai(raw_news)
-    
-    logger.info(f"🔍 [Stage 2] 본문 추출 및 심층 배치 분석 중... ({len(screened_news)}건)")
-    final_results = analyzer.deep_analyze_news_batch(screened_news)
-    
-    logger.info(f"💾 [완료] 분석 결과 구글 시트 '주요 뉴스' 탭 업로드 중...")
-    sync.update_news_tab(final_results)
-    
-    logger.info("✅ 모든 기존 프로세스가 완벽하게 복원 및 실행되었습니다.")
+        logger.info(f"📊 [Stage 1] AI 지능형 선별 중...")
+        screened_news = analyzer.screen_importance_with_ai(raw_news)
+        logger.info(f"🔍 [Stage 2] 심층 분석 중...")
+        final_results = analyzer.deep_analyze_news_batch(screened_news)
+        sync.update_news_tab(final_results)
+        
+    elif task == "risks":
+        logger.info("🚩 [리스크 분석] 시작...")
+        news_data = sync.get_tab_data("주요 뉴스")
+        risks = analyzer.analyze_risks(news_data)
+        sync.update_risks_tab(risks, tab_name="리스크 추출1")
+        
+    elif task == "persona":
+        logger.info("👤 [의원 성향 분석] 시작...")
+        # 회의록 텍스트는 시트나 드라이브에서 가져오는 로직 필요 (여기선 시트 연동 위주)
+        # 실제 구현시 드라이브 파일 읽기 로직 추가 가능
+        pass
+        
+    elif task == "questions":
+        logger.info("❓ [최종 질문 생성] 시작...")
+        news_summary = str(sync.get_tab_data("주요 뉴스")[:15])
+        risk_data = str(sync.get_tab_data("리스크 추출1")) + "\n" + str(sync.get_tab_data("리스크 추출2"))
+        persona_data = str(sync.get_tab_data("의원별 관심사"))
+        # Context는 보고서 기반
+        questions = analyzer.analyze_final_questions(news_summary, risk_data, persona_data, "업무보고 자료 맥락")
+        sync.update_questions_tab(questions)
+
+    logger.info(f"✅ 작업 완료: {task}")
 
 if __name__ == "__main__":
     main()

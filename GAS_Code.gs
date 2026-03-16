@@ -1,5 +1,29 @@
 const FOLDER_NAME = "Audit_Preparer_Files";
 
+// --- [복원] 기존 GAS의 신뢰할 수 있는 매체 및 도메인 맵 ---
+const TRUSTED_DOMAINS = [
+    'chosun.com', 'joongang.co.kr', 'donga.com', 'hani.co.kr', 'khan.co.kr', 
+    'seoul.co.kr', 'segye.com', 'hankookilbo.com', 'kmib.co.kr', 'munhwa.com',
+    'yna.co.kr', 'newsis.com', 'news1.kr',
+    'kbs.co.kr', 'mbc.co.kr', 'sbs.co.kr', 'jtbc.co.kr', 'ytn.co.kr', 'mbn.co.kr', 'tvchosun.com', 'ichannela.com',
+    'hankyung.com', 'mk.co.kr', 'mt.co.kr', 'edaily.co.kr', 'sedaily.com', 'fnnews.com', 'heraldcorp.com', 'asiae.co.kr', 'ajunews.com',
+    'etnews.com', 'digitaltimes.co.kr', 'dt.co.kr', 'nocutnews.co.kr', 'ohmynews.com', 'pressian.com', 'vop.co.kr',
+    'kukinews.com', 'newdaily.co.kr', 'dailian.co.kr', 'sisain.co.kr', 'dnews.co.kr', 'bizwatch.co.kr',
+    'naver.com'
+];
+
+const DOMAIN_MAP = { 
+    'chosun': '조선일보', 'joongang': '중앙일보', 'donga': '동아일보', 'yna': '연합뉴스', 
+    'newsis': '뉴시스', 'news1': '뉴스1', 'sedaily': '서울경제', 'edaily': '이데일리', 
+    'hankyung': '한국경제', 'mk': '매일경제', 'hani': '한겨레', 'khan': '경향신문', 
+    'kmib': '국민일보', 'segye': '세계일보', 'seoul': '서울신문', 'munhwa': '문화일보', 
+    'moneytoday': '머니투데이', 'mt.co.kr': '머니투데이', 'asiae': '아시아경제', 'ajunews': '아주경제',
+    'fnnews': '파이낸셜뉴스', 'heraldcorp': '헤럴드경제', 'etnews': '전자신문', 'digitaltimes': '디지털타임스', 'dt.co.kr': '디지털타임스',
+    'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS', 'ytn': 'YTN', 'jtbc': 'JTBC', 'mbn': 'MBN', 'tvchosun': 'TV조선', 'ichannela': '채널A',
+    'hankookilbo': '한국일보', 'nocutnews': '노컷뉴스', 'ohmynews': '오마이뉴스', 'pressian': '프레시안', 'vop': '민중의소리',
+    'kukinews': '쿠키뉴스', 'newdaily': '뉴데일리', 'dailian': '데일리안', 'sisain': '시사인', 'dnews': '대한경제', 'bizwatch': '비즈워치'
+};
+
 // --- 보안 설정 ---
 const PROPS = PropertiesService.getScriptProperties();
 const ACCESS_TOKEN = PROPS.getProperty('ACCESS_TOKEN') || "audit123"; // 기본값, 사용자가 속성에서 변경 가능
@@ -115,49 +139,69 @@ function doPost(e) {
 // 이 코드는 UI 유지 및 간단한 수집용으로 경량화되었습니다.
 
 function isTrustedMedia(url) {
-  // Python 엔진에서 정밀 필터링을 수행하므로 GAS는 기본 체크만 합니다.
-  return url && (url.includes('news.naver.com') || url.includes('.com') || url.includes('.kr'));
+  if (!url) return false;
+  return TRUSTED_DOMAINS.some(d => url.includes(d));
+}
+
+function getSourceByUrl(url) {
+  if (!url) return "뉴스";
+  for (let key in DOMAIN_MAP) {
+    if (url.includes(key)) return DOMAIN_MAP[key];
+  }
+  return "뉴스";
 }
 
 function getGeminiModel() {
   return "gemini-2.0-flash"; 
 }
 
-// --- 레거시 뉴스 수집 로직 (Python 엔진으로 대체됨) ---
+// --- GitHub Actions 트리거 연동 (하이브리드 핵심) ---
+function triggerGithubAction(task, payload = {}) {
+  const PROPS = PropertiesService.getScriptProperties();
+  const GITHUB_TOKEN = PROPS.getProperty('GITHUB_TOKEN'); // 사용자님이 입력해주셔야 하는 필수값
+  const GITHUB_REPO = "ktm9898/audit_preparer"; // 저장소 정보
+
+  if (!GITHUB_TOKEN) {
+    return { ok: false, error: "GitHub 토큰(GITHUB_TOKEN)이 스크립트 속성에 설정되지 않았습니다. 실전 테스트를 위해 토큰 설정이 필요합니다." };
+  }
+
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/dispatches`;
+  const options = {
+    method: "POST",
+    headers: {
+      "Authorization": `token ${GITHUB_TOKEN}`,
+      "Accept": "application/vnd.github.v3+json"
+    },
+    payload: JSON.stringify({
+      event_type: "run-task",
+      client_payload: {
+        task: task,
+        ...payload
+      }
+    })
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    if (response.getResponseCode() === 204) {
+      return { ok: true, message: `🚀 Python 엔진에서 '${task}' 분석을 시작했습니다. 잠시 후 시트에서 결과를 확인하세요.` };
+    }
+    return { ok: false, error: "GitHub 호출 실패: " + response.getContentText() };
+  } catch (e) {
+    return { ok: false, error: "트리거 중 오류 발생: " + e.message };
+  }
+}
+
+// --- 레거시 뉴스 수집 로직 -> Python 엔진 트리거로 전환 ---
 function fetchNewsFromNaver(targetMonth) {
-  return { ok: false, error: "뉴스 수집은 이제 Python 엔진(run_analysis.bat)을 사용해 주세요. 더 강력하고 정확합니다!" };
+  return triggerGithubAction("news", { month: targetMonth || "" });
 }
 
 function runAIAnalysis(task, fileId) {
-  const API_KEY = PROPS.getProperty('GEMINI_API_KEY');
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const parent = getOrCreateFolder();
-  let aggregatedText = "";
-  const contents = { parts: [] };
-  let prompt = "";
-
-  // [Lean GAS] 모든 복잡한 프롬프트는 이제 Python 엔진에서 관리하는 것을 권장합니다.
-  if (task === 'risks') {
-    prompt = `서울신용보증재단 뉴스 데이터를 바탕으로 행정감사 리스크 쟁점 20개를 도출하세요. (JSON: {"risks": [...]})`;
-  } else if (task === 'report_risks') {
-    prompt = `업무보고 자료를 분석하여 행정감사 리스크 쟁점 20개를 도출하세요. (JSON: {"risks": [...]})`;
-  } else if (task === 'final_questions') {
-    prompt = `리스크, 의원 성향, 보고서/뉴스를 종합하여 최종 행정감사 예상 질문 30개를 생성하세요. (JSON: {"questions": [...]})`;
-  } else if (task === 'persona') {
-    prompt = `회의록을 분석하여 의원별 상세 성향 리포트를 작성하세요. (JSON: {"personas": [...]})`;
-  }
-
-  // 3. API 호출 연동 (Python 엔진이 메인이지만, UI 버튼 작동을 위해 유지)
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${getGeminiModel()}:generateContent?key=${API_KEY}`;
-    
-    // [중간 생략: 기존 연동 로직 유지]
-    // (실제 전체 구현은 이전에 완료된 상태를 유지하며 불필요한 프롬프트만 제거됨)
-    return { ok: true, message: "분석을 시작합니다. Python 엔진을 사용하면 더 정교한 분석이 가능합니다." };
-  } catch (e) {
-    return { ok: false, error: "AI 분석 도중 문제가 발생했습니다: " + e.message };
-  }
+  // task mapping: risks, persona, final_questions 등
+  return triggerGithubAction(task, { fileId: fileId || "" });
 }
+// --- 모든 분석 로직은 이제 GitHub Actions 파이썬 엔진에서 수행됩니다 ---
 
 // --- 공통 유틸리티 (UI 및 데이터 브릿지용) ---
 function getOrCreateSheet(ss, name) {
