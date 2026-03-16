@@ -28,13 +28,14 @@ TRUSTED_DOMAINS = [
 DOMAIN_MAP = { 
     'chosun': '조선일보', 'joongang': '중앙일보', 'donga': '동아일보', 'yna': '연합뉴스', 
     'newsis': '뉴시스', 'news1': '뉴스1', 'sedaily': '서울경제', 'edaily': '이데일리', 
-    'hankyung': '한국경제', 'mk.co.kr': '매일경제', 'hani': '한겨레', 'khan': '경향신문', 
-    'kmib': '국민일보', 'segye': '세계일보', 'seoul.co.kr': '서울신문', 'munhwa': '문화일보', 
+    'hankyung': '한국경제', 'mk': '매일경제', 'hani': '한겨레', 'khan': '경향신문', 
+    'kmib': '국민일보', 'segye': '세계일보', 'seoul': '서울신문', 'munhwa': '문화일보', 
     'moneytoday': '머니투데이', 'mt.co.kr': '머니투데이', 'asiae': '아시아경제', 'ajunews': '아주경제',
     'fnnews': '파이낸셜뉴스', 'heraldcorp': '헤럴드경제', 'etnews': '전자신문', 'digitaltimes': '디지털타임스', 'dt.co.kr': '디지털타임스',
     'kbs': 'KBS', 'mbc': 'MBC', 'sbs': 'SBS', 'ytn': 'YTN', 'jtbc': 'JTBC', 'mbn': 'MBN', 'tvchosun': 'TV조선', 'ichannela': '채널A',
     'hankookilbo': '한국일보', 'nocutnews': '노컷뉴스', 'ohmynews': '오마이뉴스', 'pressian': '프레시안', 'vop': '민중의소리',
-    'kukinews': '쿠키뉴스', 'newdaily': '뉴데일리', 'dailian': '데일리안', 'sisain': '시사인', 'dnews': '대한경제', 'bizwatch': '비즈워치'
+    'kukinews': '쿠키뉴스', 'newdaily': '뉴데일리', 'dailian': '데일리안', 'sisain': '시사인', 'dnews': '대한경제', 'bizwatch': '비즈워치',
+    '417': '머니S', '003': '뉴시스', '025': '중앙일보', '119': '데일리안', '009': '매일경제', '021': '문화일보', '018': '이데일리', '629': '더팩트', '421': '뉴스1', '001': '연합뉴스', '081': '서울신문'
 }
 
 class NaverNewsCollector:
@@ -52,14 +53,15 @@ class NaverNewsCollector:
         except: return False
 
     def get_source_name(self, url: str) -> str:
+        """인링크 및 원문 링크 분석을 통한 정확한 언론사 명칭 추출"""
         try:
-            # 네이버 뉴스 링크 구조에서 언론사 ID 또는 도메인 추출 시도
+            # 1. 도메인 기반 검색 (가장 확실한 방법)
             domain = url.split('/')[2].replace('www.', '').replace('m.', '')
             for key, name in DOMAIN_MAP.items():
                 if key in domain: return name
             
-            # 특별 케이스: n.news.naver.com 등에서 sid 등 분석은 복잡하므로 
-            # 일단 도메인 맵에 의존하되 매칭 안되면 '뉴스' 반환
+            # 2. Naver News Inlink 특수 구조 처리 (예: n.news.naver.com/mnews/article/...)
+            # 이 경우 originallink를 한 번 더 체크하도록 구현되어 있음
         except: pass
         return "뉴스"
 

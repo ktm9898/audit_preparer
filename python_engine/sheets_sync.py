@@ -59,21 +59,20 @@ class SheetsSync:
                 worksheet.append_row(['날짜', '언론사', '제목', 'AI요약', '중요도', '분야', '링크', '마지막 업데이트'])
 
             for item in news_data:
-                # GAS UI 기대 순서: [날짜, 언론사, 제목, 요약, 중요도, 분야, 링크, 업데이트시간]
+                # 사용자 예시 기반 순서: [날짜(A), 구분/중요도(B), 언론사(C), 제목(D), 요약(E), 링크(F), 업데이트시간(G)]
                 rows.append([
-                    item.get("pubDate", today), 
-                    item.get("source", "뉴스"), 
-                    item.get("title", ""), 
-                    item.get("ai_summary", item.get("description", "")), 
-                    item.get("importance", "중"), 
-                    item.get("category", "기타"), 
-                    item.get("link", ""), 
-                    today
+                    item.get("pubDate", today), # A: 기사 발행일
+                    "-",                         # B: 구분/중요도 (기본값)
+                    item.get("source", "뉴스"),  # C: 언론사 (Naver 인링크 기반)
+                    item.get("title", ""),       # D: 제목
+                    item.get("ai_summary", item.get("description", "")), # E: 요약
+                    item.get("link", ""),        # F: 링크
+                    today                        # G: 업데이트시간
                 ])
             
-            # 시트의 맨 아래에 추가
-            worksheet.append_rows(rows)
-            logger.info(f"구글 시트에 {len(rows)}건 저장 완료.")
+            # 시트의 최상단(헤더 아래 2행)에 삽입 (최근 날짜가 위로 오도록)
+            worksheet.insert_rows(rows, 2)
+            logger.info(f"구글 시트 상단에 {len(rows)}건 저장 완료.")
         except Exception as e:
             logger.error(f"Sheets Update Error: {e}")
 
