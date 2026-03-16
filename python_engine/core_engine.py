@@ -120,10 +120,23 @@ class GeminiAnalyzer:
             results.append(news)
             time.sleep(1) # Rate limit 방지
             
-    def analyze_risks(self, news_list: List[Dict]) -> List[Dict]:
-        """뉴스 기반 리스크 추출"""
-        news_text = "\n".join([f"[{n.get('date', '')}] {n.get('title', '')}" for n in news_list])
-        prompt = f"[미션] 서울신용보증재단 뉴스 데이터를 바탕으로 행정감사 리스크 쟁점을 도출하세요.\n뉴스:\n{news_text}"
+    def analyze_risks(self, news_list: List[Dict], source_type: str = "news") -> List[Dict]:
+        """행정감사 리스크 쟁점 도출 (기존 GAS 정밀 프롬프트 복원)"""
+        data_text = "\n".join([f"[{n.get('date', '')}] {n.get('title', '')}" for n in news_list])
+        
+        prompt = f"""[미션] 서울신용보증재단 {source_type} 데이터를 바탕으로 행정감사 리스크 쟁점 20개를 도출하세요. 
+
+[지시사항]
+1. 단순 나열이 아닌, 실제 행정사무감사에서 질의가 가능한 '쟁점' 위주로 도출하세요.
+2. 각 리스크별로 구체적인 '세부 내용'과 근거가 되는 '관련 뉴스/문서'를 명시하세요.
+3. 예상되는 파급력과 재단의 대응 필요성을 고려하여 선정하세요.
+
+반드시 JSON 형식으로 응답:
+{{"risks": [{{"리스크 요인": "...", "세부 내용": "...", "관련 근거": "..."}}]}}
+
+[데이터]
+{data_text}
+"""
         try:
             resp = self.model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
             return json.loads(resp.text).get("risks", [])
@@ -132,8 +145,27 @@ class GeminiAnalyzer:
             return []
 
     def analyze_personas(self, minutes_text: str) -> List[Dict]:
-        """회의록 기반 의원 성향 분석"""
-        prompt = f"당신은 행정사무감사 전문 분석 AI입니다. 의원별 상세 성향 리포트를 작성하세요.\n회의록:\n{minutes_text}"
+        """의원별 상세 성향 리포트 작성 (기존 GAS 정밀 프롬프트 복원)"""
+        prompt = f"""당신은 행정사무감사 전문 분석 AI입니다. 제공된 회의록을 분석하여 의원별 상세 성향 리포트를 작성하세요.
+
+[지시사항]
+1. 의원별로 주요 관심 분야, 질문의 날카로움(성향), 주로 공격하는 포인트 등을 정밀하게 파악하세요.
+2. '발언 요약'은 해당 의원의 핵심 주장을 한눈에 알 수 있게 작성하세요.
+3. 재단 입장에서는 어떤 대응 논리가 필요할지도 염두에 두어 '예상 감사 포인트'를 도출하세요.
+
+반드시 JSON 형식으로 응답:
+{{"personas": [{{
+    "의원명": "...", 
+    "지역구": "...", 
+    "주요 관심사": "...", 
+    "질문 성향": "...", 
+    "예상 감사 포인트": "...", 
+    "발언요약": "..."
+}}]}}
+
+[회의록 데이터]
+{minutes_text}
+"""
         try:
             resp = self.model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
             return json.loads(resp.text).get("personas", [])
@@ -141,9 +173,30 @@ class GeminiAnalyzer:
             logger.error(f"Persona Analysis Error: {e}")
             return []
 
-    def analyze_final_questions(self, data: Dict) -> List[Dict]:
-        """종합 정보를 바탕으로 최종 예상 질문 생성"""
-        prompt = f"리스크, 의원 성향, 뉴스를 종합하여 최종 행정감사 예상 질문을 생성하세요.\n데이터: {json.dumps(data, ensure_ascii=False)}"
+    def analyze_final_questions(self, news_data: str, risk_data: str, persona_data: str, report_context: str) -> List[Dict]:
+        """최종 행정감사 예상 질문 생성 (기존 GAS 정밀 프롬프트 및 핵심 지침 완벽 복원)"""
+        prompt = f"""[미션] 리스크 요인(Step 1,2), 의원 성향, 그리고 '보고서/뉴스 원문'을 종합하여 최종 행정감사 예상 질문 30개를 생성하세요.
+
+[핵심 지침]
+1. 원문 맥락 철저 분석: 추출된 리스크를 최우선 고려하되, 실제 질문은 반드시 함께 제공된 '뉴스 원문'과 '업무보고 원문'의 구체적인 수치, 사업명, 문제 사례를 바탕으로 해야 합니다.
+2. 과거 질문 반복 절대 금지: 의원 성향 데이터에 있는 과거 발언은 '스타일 파악용'입니다. 기존 질문을 재탕하지 마십시오.
+3. 융합적 분석: "의원 페르소나 + 구체적 사안(Source Context) + 현재의 이슈(News)"를 결합하세요.
+4. 실무적 예리함: 구체적인 데이터나 페이지, 사업명을 인용하여 날카로운 질문을 설계하세요.
+
+[데이터]
+1. 뉴스 원문(요약): {news_data}
+2. 추출 리스크: {risk_data}
+3. 의원 성향 메타데이터: {persona_data}
+4. 업무보고 자료 원문 (Context): {report_context}
+
+반드시 JSON 형식으로 응답:
+{{"questions": [{{
+    "분류": "...", 
+    "의원명": "...", 
+    "질문": "...", 
+    "답변 가이드": "..."
+}}]}}
+"""
         try:
             resp = self.model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
             return json.loads(resp.text).get("questions", [])
