@@ -100,13 +100,19 @@ class NaverNewsCollector:
                         link = item.get("originallink", link)
                     
                     if self.is_trusted_media(link):
-                        processed.append({
-                            "title": item["title"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip(),
-                            "link": link,
-                            "pubDate": item["pubDate"],
-                            "description": item["description"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip(),
-                            "source": self.get_source_name(item.get("originallink", link))
-                        })
+                        title = item["title"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip()
+                        desc = item["description"].replace("<b>", "").replace("</b>", "").replace("&quot;", '"').strip()
+                        
+                        # 엄격한 키워드 필터링: 제목이나 설명에 재단 명칭이 반드시 포함되어야 함
+                        target_keywords = ["서울신용보증재단", "서울신보"]
+                        if any(kw in title or kw in desc for kw in target_keywords):
+                            processed.append({
+                                "title": title,
+                                "link": link,
+                                "pubDate": item["pubDate"],
+                                "description": desc,
+                                "source": self.get_source_name(item.get("originallink", link))
+                            })
                 
                 # 너무 빠른 요청 방지
                 time.sleep(0.1)
