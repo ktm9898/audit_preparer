@@ -53,9 +53,13 @@ class NaverNewsCollector:
 
     def get_source_name(self, url: str) -> str:
         try:
+            # 네이버 뉴스 링크 구조에서 언론사 ID 또는 도메인 추출 시도
             domain = url.split('/')[2].replace('www.', '').replace('m.', '')
             for key, name in DOMAIN_MAP.items():
                 if key in domain: return name
+            
+            # 특별 케이스: n.news.naver.com 등에서 sid 등 분석은 복잡하므로 
+            # 일단 도메인 맵에 의존하되 매칭 안되면 '뉴스' 반환
         except: pass
         return "뉴스"
 
@@ -266,9 +270,6 @@ def main():
                 except Exception as e:
                     logger.error(f"Date Parse Error: {e} for {n.get('pubDate')}")
             raw_news = filtered
-        
-        # [추가] 시트 비우기 (분석 시작 신호)
-        sync.clear_news_tab()
         
         if not raw_news:
             logger.warning(f"⚠️ 검색 결과가 0건입니다. (쿼리: {SEARCH_QUERY}, 월: {args.month})")
