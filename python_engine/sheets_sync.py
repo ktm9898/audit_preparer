@@ -29,6 +29,21 @@ class SheetsSync:
             logger.error(f"Google Sheets Auth Error: {e}")
             return None
 
+    def clear_news_tab(self):
+        """분석 시작 전 '주요 뉴스' 탭을 비움 (진행 상태 표시 대용)"""
+        if not self.client: return
+        try:
+            sh = self.client.open_by_key(GOOGLE_SHEET_ID)
+            try:
+                worksheet = sh.worksheet("주요 뉴스")
+                # 헤더만 남기고 모두 삭제
+                worksheet.clear()
+                worksheet.append_row(['날짜', '언론사', '제목', 'AI요약', '중요도', '분야', '링크', '마지막 업데이트'])
+                logger.info("시트를 비우고 분석 준비 완료.")
+            except: pass
+        except Exception as e:
+            logger.error(f"Clear Sheet Error: {e}")
+
     def update_news_tab(self, news_data: List[Dict]):
         """'주요 뉴스' 탭을 업데이트 (Append 방식 또는 Overwrite 방식)"""
         if not self.client:
@@ -43,26 +58,22 @@ class SheetsSync:
                 # GAS 규격 헤더: [pubDate, source, title, summary, importance, category, link, updateTime]
                 worksheet.append_row(['날짜', '언론사', '제목', 'AI요약', '중요도', '분야', '링크', '마지막 업데이트'])
 
-            # 데이터 변환 (GAS 규격에 맞춤)
-            rows = []
-            import datetime
-            today = datetime.datetime.now().strftime("%Y.%m.%d")
-            
             for item in news_data:
+                # GAS UI 기대 순서: [날짜, 언론사, 제목, 요약, 중요도, 분야, 링크, 업데이트시간]
                 rows.append([
-                    item.get("pubDate", today), # 날짜 (네이버 제공 날짜 우선)
-                    item.get("source", "뉴스"),  # 언론사
-                    item.get("title", ""),      # 제목
-                    item.get("ai_summary", item.get("description", "")), # 요약 (AI요약 우선)
-                    item.get("importance", "-"), # 중요도
-                    item.get("category", "-"),   # 분야
-                    item.get("link", ""),        # 링크
-                    today                        # 마지막 업데이트 (현재 시간)
+                    item.get("pubDate", today), 
+                    item.get("source", "뉴스"), 
+                    item.get("title", ""), 
+                    item.get("ai_summary", item.get("description", "")), 
+                    item.get("importance", "중"), 
+                    item.get("category", "기타"), 
+                    item.get("link", ""), 
+                    today
                 ])
             
             # 시트의 맨 아래에 추가
             worksheet.append_rows(rows)
-            logger.info(f"구글 시트 '주요 뉴스' 탭에 {len(rows)}건 저장 완료.")
+            logger.info(f"구글 시트에 {len(rows)}건 저장 완료.")
         except Exception as e:
             logger.error(f"Sheets Update Error: {e}")
 

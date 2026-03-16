@@ -194,6 +194,8 @@ function triggerGithubAction(task, payload = {}) {
 
 // --- 레거시 뉴스 수집 로직 -> Python 엔진 트리거로 전환 ---
 function fetchNewsFromNaver(targetMonth) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ss.toast("Python 엔진이 깃허브에서 분석을 시작했습니다. 약 1~2분 후 시트를 확인해 주세요.", "🚀 분석 시작", 10);
   return triggerGithubAction("news", { month: targetMonth || "" });
 }
 

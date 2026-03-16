@@ -213,7 +213,10 @@ class GeminiAnalyzer:
 class ArticleExtractor:
     def extract(self, url: str) -> str:
         try:
-            article = Article(url, language='ko')
+            # User-Agent 추가로 차단 방지
+            config = Article.config()
+            config.browser_user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            article = Article(url, language='ko', config=config)
             article.download()
             article.parse()
             return article.text.strip()
@@ -257,11 +260,15 @@ def main():
                     # Naver pubDate: "Mon, 16 Mar 2026 10:00:00 +0900"
                     dt = parsedate_to_datetime(n.get('pubDate', ''))
                     yyyymm = dt.strftime("%Y.%m")
+                    n['pubDate'] = dt.strftime("%Y.%m.%d") # 시트 표시용 날짜 고정
                     if yyyymm == args.month:
                         filtered.append(n)
                 except Exception as e:
                     logger.error(f"Date Parse Error: {e} for {n.get('pubDate')}")
             raw_news = filtered
+        
+        # [추가] 시트 비우기 (분석 시작 신호)
+        sync.clear_news_tab()
         
         if not raw_news:
             logger.warning(f"⚠️ 검색 결과가 0건입니다. (쿼리: {SEARCH_QUERY}, 월: {args.month})")
