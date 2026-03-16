@@ -160,10 +160,11 @@ function fetchNewsFromNaver(targetMonth) {
     for (let start = 1; start <= 1000; start += displayCount) {
       if (stopSearch) break;
 
-      const query = `${baseQuery} ${targetMonth}`;
-      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=${displayCount}&start=${start}&sort=date`;
+      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(baseQuery)}&display=${displayCount}&start=${start}&sort=date`;
       try {
         const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
+        // 디버깅을 위한 상세 로그 기록
+        console.log(`[네이버 응답] URL: ${url}, Code: ${response.getResponseCode()}`);
         if (response.getResponseCode() === 200) {
           const data = JSON.parse(response.getContentText());
           if (!data.items || data.items.length === 0) break;
@@ -176,11 +177,6 @@ function fetchNewsFromNaver(targetMonth) {
 
             if (itemYM === targetMonth) {
               allItems.push(item);
-            } else if (itemYM < targetMonth) {
-              // 검색 결과가 대상 월보다 과거로 넘어감 -> 탐색 중단
-              console.log(`[중단] 과거 데이터 발견 (${itemYM} < ${targetMonth}). 루프를 종료합니다.`);
-              stopSearch = true;
-              break;
             }
           }
         } else {
