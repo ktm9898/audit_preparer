@@ -191,7 +191,7 @@ function fetchNewsFromNaver(targetMonth) {
         break;
       }
     }
-    console.log(`[수집 완료] 총 후보 기사 ${allItems.length}건 확보 (필터링 전)`);
+    console.log(`[수집 완료] 대상 월(${targetMonth}) 후보 기사 ${allItems.length}건 확보 (필터링 전)`);
   } else {
     // 월 지정이 없으면 전체 흐름 (최근 12개월 루프)
     const now = new Date();
@@ -210,7 +210,10 @@ function fetchNewsFromNaver(targetMonth) {
     }
   }
 
-  if (allItems.length === 0) return { ok: false, error: "뉴스를 가져오지 못했습니다." };
+  if (allItems.length === 0) {
+    const errorMsg = targetMonth ? `${targetMonth}월에 해당하는 뉴스가 네이버 검색 결과에 없습니다.` : "뉴스를 가져오지 못했습니다. 네이버 API 응답을 확인하세요.";
+    return { ok: false, error: errorMsg };
+  }
 
   // 2. 데이터 정제 및 후보군 확보 (시트 대조 생략 - AI가 직접 중복 제거 수행)
   const processedItems = [];
