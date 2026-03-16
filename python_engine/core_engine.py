@@ -3,6 +3,7 @@ import logging
 import requests
 import time
 import datetime
+from email.utils import parsedate_to_datetime
 from typing import List, Dict, Tuple
 from newspaper import Article
 import google.generativeai as genai
@@ -238,7 +239,17 @@ def main():
         logger.info(f"🚀 [뉴스 수집] 시작: {SEARCH_QUERY} (월: {args.month})")
         raw_news = collector.fetch_news(SEARCH_QUERY)
         if args.month:
-            raw_news = [n for n in raw_news if args.month in n.get('pubDate', '')]
+            filtered = []
+            for n in raw_news:
+                try:
+                    # Naver pubDate: "Mon, 16 Mar 2026 10:00:00 +0900"
+                    dt = parsedate_to_datetime(n.get('pubDate', ''))
+                    yyyymm = dt.strftime("%Y.%m")
+                    if yyyymm == args.month:
+                        filtered.append(n)
+                except Exception as e:
+                    logger.error(f"Date Parse Error: {e} for {n.get('pubDate')}")
+            raw_news = filtered
         
         if not raw_news:
             logger.warning("수집된 뉴스가 없습니다.")
