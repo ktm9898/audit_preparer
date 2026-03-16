@@ -29,6 +29,18 @@ class SheetsSync:
             logger.error(f"Google Sheets Auth Error: {e}")
             return None
 
+    def get_existing_links(self) -> List[str]:
+        """시트에 이미 존재하는 기사 링크들을 가져옴 (중복 수집 방지용)"""
+        if not self.client: return []
+        try:
+            sh = self.client.open_by_key(GOOGLE_SHEET_ID)
+            worksheet = sh.worksheet("주요 뉴스")
+            # F열(6번째)이 링크 컬럼. 2행부터 끝까지 가져옴
+            return worksheet.col_values(6)[1:]
+        except Exception as e:
+            logger.error(f"Get Links Error: {e}")
+            return []
+
     def clear_news_tab(self):
         """분석 시작 전 '주요 뉴스' 탭을 비움 (진행 상태 표시 대용)"""
         if not self.client: return
@@ -36,53 +48,45 @@ class SheetsSync:
             sh = self.client.open_by_key(GOOGLE_SHEET_ID)
             try:
                 worksheet = sh.worksheet("주요 뉴스")
-                # 헤더만 남기고 모두 삭제
                 worksheet.clear()
-                worksheet.append_row(['날짜', '언론사', '제목', 'AI요약', '중요도', '분야', '링크', '마지막 업데이트'])
+                worksheet.append_row(['날짜', '상태', '언론사', '제목', 'AI요약', '링크', '마지막 업데이트'])
                 logger.info("시트를 비우고 분석 준비 완료.")
             except: pass
         except Exception as e:
             logger.error(f"Clear Sheet Error: {e}")
 
     def update_news_tab(self, news_data: List[Dict]):
-        """'주요 뉴스' 탭을 업데이트 (Append 방식 또는 Overwrite 방식)"""
-        if not self.client:
-            return
-        
+        """'주요 뉴스' 탭을 업데이트 (Append 방식)"""
+        if not self.client: return
         try:
             sh = self.client.open_by_key(GOOGLE_SHEET_ID)
             try:
                 worksheet = sh.worksheet("주요 뉴스")
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title="주요 뉴스", rows="100", cols="20")
-                # GAS 규격 헤더: [pubDate, source, title, summary, importance, category, link, updateTime]
-                worksheet.append_row(['날짜', '언론사', '제목', 'AI요약', '중요도', '분야', '링크', '마지막 업데이트'])
+                worksheet.append_row(['날짜', '상태', '언론사', '제목', 'AI요약', '링크', '마지막 업데이트'])
 
-            # 데이터 변환 (GAS 규격에 맞춤)
-            rows = []
             import datetime
             today = datetime.datetime.now().strftime("%Y.%m.%d")
             
-            # 데이터 변환 (GAS 규격에 맞춤)
             rows = []
-            import datetime
-            today = datetime.datetime.now().strftime("%Y.%m.%d")
-            
             for item in news_data:
-                # 사용자 예시 기반 순서: [날짜(A), 구분/중요도(B), 언론사(C), 제목(D), 요약(E), 링크(F), 업데이트시간(G)]
+                # [A:날짜, B:상태, C:언론사, D:제목, E:AI요약, F:링크, G:마지막 업데이트]
                 rows.append([
-                    item.get("pubDate", today), # A: 기사 발행일
-                    "-",                         # B: 구분/중요도 (기본값)
-                    item.get("source", "뉴스"),  # C: 언론사 (Naver 인링크 기반)
-                    item.get("title", ""),       # D: 제목
-                    item.get("ai_summary", item.get("description", "")), # E: 요약
-                    item.get("link", ""),        # F: 링크
-                    today                        # G: 업데이트시간
+                    item.get("pubDate", today), 
+                    item.get("importance", "-"), 
+                    item.get("source", "뉴스"), 
+                    item.get("title", ""), 
+                    item.get("ai_summary", item.get("description", "")), 
+                    item.get("link", ""), 
+                    today
                 ])
             
-            # 시트의 맨 아래에 추가 (순차적으로 쌓임)
-            worksheet.append_rows(rows)
-            logger.info(f"구글 시트에 {len(rows)}건 저장 완료.")
+            if rows:
+                worksheet.append_rows(rows)
+                logger.info(f"구글 시트에 {len(rows)}건 저장 완료.")
+        except Exception as e:
+            logger.error(f"Sheets Update Error: {e}")
         except Exception as e:
             logger.error(f"Sheets Update Error: {e}")
 
