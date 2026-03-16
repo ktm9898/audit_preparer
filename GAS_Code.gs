@@ -160,8 +160,7 @@ function fetchNewsFromNaver(targetMonth) {
     for (let start = 1; start <= 1000; start += displayCount) {
       if (stopSearch) break;
 
-      const query = `${baseQuery} ${targetMonth}`;
-      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(query)}&display=${displayCount}&start=${start}&sort=sim`;
+      const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(baseQuery)}&display=${displayCount}&start=${start}&sort=date`;
       try {
         const response = UrlFetchApp.fetch(url, { headers: apiHeaders, muteHttpExceptions: true });
         // 디버깅을 위한 상세 로그 기록
@@ -178,6 +177,11 @@ function fetchNewsFromNaver(targetMonth) {
 
             if (itemYM === targetMonth) {
               allItems.push(item);
+            } else if (itemYM < targetMonth) {
+              // 검색 결과가 대상 월보다 과거로 넘어감 -> 탐색 중단
+              console.log(`[중단] 과거 데이터 발견 (${itemYM} < ${targetMonth}). 루프를 종료합니다.`);
+              stopSearch = true;
+              break;
             }
           }
         } else {
@@ -208,10 +212,7 @@ function fetchNewsFromNaver(targetMonth) {
     }
   }
 
-  if (allItems.length === 0) {
-    const errorMsg = targetMonth ? `${targetMonth}월에 해당하는 뉴스가 네이버 검색 결과에 없습니다.` : "뉴스를 가져오지 못했습니다. 네이버 API 응답을 확인하세요.";
-    return { ok: false, error: errorMsg };
-  }
+  if (allItems.length === 0) return { ok: false, error: "뉴스를 가져오지 못했습니다." };
 
   // 2. 데이터 정제 및 후보군 확보 (시트 대조 생략 - AI가 직접 중복 제거 수행)
   const processedItems = [];
