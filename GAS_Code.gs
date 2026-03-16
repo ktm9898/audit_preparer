@@ -152,7 +152,7 @@ function getSourceByUrl(url) {
 }
 
 function getGeminiModel() {
-  return "gemini-2.0-flash"; 
+  return "gemini-3-flash-preview"; 
 }
 
 // --- GitHub Actions 트리거 연동 (하이브리드 핵심) ---
