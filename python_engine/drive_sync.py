@@ -32,15 +32,28 @@ class DriveSync:
             return None
 
     def _get_folder_id(self, folder_name: str, parent_id: str = None) -> str:
-        """이름으로 폴더 ID 찾기"""
+        """이름으로 폴더 ID 찾기 (공유 드라이브 및 모든 항목 검색 포함)"""
         if not self.service: return None
         query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
         if parent_id:
             query += f" and '{parent_id}' in parents"
             
-        results = self.service.files().list(q=query, fields="files(id, name)").execute()
-        files = results.get('files', [])
-        return files[0]['id'] if files else None
+        try:
+            results = self.service.files().list(
+                q=query, 
+                fields="files(id, name)",
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
+            files = results.get('files', [])
+            if files:
+                logger.info(f"📁 폴더 발견: {folder_name} (ID: {files[0]['id']})")
+                return files[0]['id']
+            logger.warning(f"⚠️ 폴더를 찾을 수 없음: {folder_name}")
+            return None
+        except Exception as e:
+            logger.error(f"Folder Search Error ({folder_name}): {e}")
+            return None
 
     def get_files_from_folder(self, subfolder_name: str, specific_file_id: str = None) -> List[Dict]:
         """지정된 보관함 폴더(reports 또는 minutes)의 파일 목록 또는 특정 파일 정보 반환"""
@@ -48,7 +61,11 @@ class DriveSync:
         
         if specific_file_id:
             try:
-                file_meta = self.service.files().get(fileId=specific_file_id, fields="id, name, mimeType").execute()
+                file_meta = self.service.files().get(
+                    fileId=specific_file_id, 
+                    fields="id, name, mimeType",
+                    supportsAllDrives=True
+                ).execute()
                 return [file_meta]
             except Exception as e:
                 logger.error(f"Get Specific File Error: {e}")
@@ -57,18 +74,30 @@ class DriveSync:
         # "Audit_Preparer_Files" 폴더 찾기
         parent_id = self._get_folder_id("Audit_Preparer_Files")
         if not parent_id:
-            logger.error("Audit_Preparer_Files 폴더를 찾을 수 없습니다.")
+            logger.error("Audit_Preparer_Files 폴더를 찾을 수 없습니다. 서비스 계정에 폴더가 공유되었는지 확인하세요.")
             return []
             
         target_folder_id = self._get_folder_id(subfolder_name, parent_id)
         if not target_folder_id:
-            logger.error(f"{subfolder_name} 폴더를 찾을 수 없습니다.")
+            logger.error(f"{subfolder_name} 폴더를 찾을 수 없습니다. (상위 폴더 ID: {parent_id})")
             return []
             
         # 해당 폴더 내의 모든 파일
         query = f"'{target_folder_id}' in parents and mimeType!='application/vnd.google-apps.folder' and trashed=false"
-        results = self.service.files().list(q=query, fields="files(id, name, mimeType)").execute()
-        return results.get('files', [])
+        try:
+            results = self.service.files().list(
+                q=query, 
+                fields="files(id, name, mimeType)",
+                pageSize=1000,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
+            ).execute()
+            all_files = results.get('files', [])
+            logger.info(f"📂 {subfolder_name} 폴더 내 파일 {len(all_files)}개 발견")
+            return all_files
+        except Exception as e:
+            logger.error(f"List Files Error ({subfolder_name}): {e}")
+            return []
 
     def get_report_files(self, specific_file_id: str = None) -> List[Dict]:
         return self.get_files_from_folder("reports", specific_file_id)

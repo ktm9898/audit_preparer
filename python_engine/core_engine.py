@@ -407,17 +407,21 @@ def main():
         
         if not files:
             logger.warning("분석할 회의록 파일이 없습니다.")
-            minutes_text = "회의록 데이터가 없습니다."
+            personas = [{"의원명": "분석 불가", "지역구": "데이터 없음", "주요 관심사": "회의록 파일 부재", "질문 성향": "-", "예상 감사 포인트": "-", "발언요약": "보관함에 분석할 회의록 파일이 없습니다. 파일을 업로드 후 다시 실행해 주세요."}]
         else:
             texts = []
             for f in files:
                 logger.info(f"📄 회의록 파싱 중: {f['name']}")
                 text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
                 if text:
-                    texts.append(text[:20000]) # 회의록은 특히 길 수 있으므로 적절히 자름
-            minutes_text = "\n\n".join(texts)
+                    texts.append(f"--- 회의록: {f['name']} ---\n{text[:20000]}")
             
-        personas = analyzer.analyze_personas(minutes_text)
+            if not texts:
+                personas = [{"의원명": "분석 불가", "지역구": "추출 실패", "주요 관심사": "텍스트 추출 실패", "질문 성향": "-", "예상 감사 포인트": "-", "발언요약": "파일은 있으나 텍스트를 추출하지 못했습니다. (지원되지 않는 포맷 등)"}]
+            else:
+                minutes_text = "\n\n".join(texts)
+                personas = analyzer.analyze_personas(minutes_text)
+                
         sync.update_persona_tab(personas)
         
     elif task == "questions":
