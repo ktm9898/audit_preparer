@@ -179,8 +179,8 @@ class SheetsSync:
             import datetime
             now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-            # 헤더: 의원명, 지역구, 주요 관심사, 발언 요약, 질문 성향, 예상 감사 포인트, 마지막 업데이트
-            header = ['의원명', '지역구', '주요 관심사', '발언 요약', '질문 성향', '예상 감사 포인트', '마지막 업데이트']
+            # 헤더: 의원명, 지역구, 주요 관심사, 발언 요약, 질문 성향, 핵심 감사 포인트, 마지막 업데이트
+            header = ['의원명', '지역구', '주요 관심사', '발언 요약', '질문 성향', '핵심 감사 포인트', '마지막 업데이트']
             values = [header]
             
             for item in persona_data:
@@ -196,7 +196,7 @@ class SheetsSync:
                     safe_str(item.get("주요 관심사", item.get("관심사", ""))),
                     safe_str(item.get("발언 요약", item.get("발언요약", item.get("상세발언", "")))),
                     safe_str(item.get("질문 성향", item.get("성향", ""))),
-                    safe_str(item.get("예상 감사 포인트", item.get("감사 포인트", ""))),
+                    safe_str(item.get("핵심 감사 포인트", item.get("예상 감사 포인트", item.get("감사 포인트", "")))),
                     now_str
                 ]
                 values.append(row)
