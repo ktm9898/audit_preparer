@@ -8,3 +8,6 @@ lxml_html_clean
 python-dotenv
 beautifulsoup4
 nltk
+google-api-python-client
+pymupdf
+python-docx

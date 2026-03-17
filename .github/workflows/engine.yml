@@ -13,6 +13,10 @@ on:
         description: 'Target month (e.g., 2024.03)'
         required: false
         default: ''
+      fileId:
+        description: 'Specific file ID in Google Drive'
+        required: false
+        default: ''
 
 jobs:
   run-engine:
@@ -44,16 +48,18 @@ jobs:
           echo "$GOOGLE_CREDENTIALS_JSON" > python_engine/service_account.json
           export GOOGLE_APPLICATION_CREDENTIALS=python_engine/service_account.json
           
-          # dispatch 데이터에서 task와 month 추출
+          # dispatch 데이터에서 task와 month, fileId 추출
           TASK="${{ github.event.client_payload.task }}"
           MONTH="${{ github.event.client_payload.month }}"
+          FILE_ID="${{ github.event.client_payload.fileId }}"
           
           # 만약 workflow_dispatch로 실행했다면 입력을 사용
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             TASK="${{ github.event.inputs.task }}"
             MONTH="${{ github.event.inputs.month }}"
+            FILE_ID="${{ github.event.inputs.fileId }}" # workflow_dispatch에 없더라도 빈 값 처리
           fi
           
-          echo "Running Task: $TASK (Month: $MONTH)"
+          echo "Running Task: $TASK (Month: $MONTH, FileId: $FILE_ID)"
           cd python_engine
-          python core_engine.py --task "$TASK" --month "$MONTH"
+          python core_engine.py --task "$TASK" --month "$MONTH" --file_id "$FILE_ID"

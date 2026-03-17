@@ -18,6 +18,7 @@ try:
 except Exception as e:
     print(f"NLTK Download Warning: {e}")
 from sheets_sync import SheetsSync
+from drive_sync import DriveSync
 
 logger = logging.getLogger(__name__)
 
@@ -291,6 +292,7 @@ def main():
     parser = argparse.ArgumentParser(description="Audit Preparer AI Engine")
     parser.add_argument("--task", type=str, help="Excution task: news, risks, persona, questions")
     parser.add_argument("--month", type=str, help="Target month for news (e.g., 2024.03)", default="")
+    parser.add_argument("--file_id", type=str, help="Target file ID in Google Drive", default="")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -347,24 +349,78 @@ def main():
         sync.update_news_tab(final_results)
         
     elif task == "risks":
-        logger.info("🚩 [리스크 분석] 시작...")
+        logger.info("🚩 [리스크 분석 1단계] 시작...")
         news_data = sync.get_tab_data("주요 뉴스")
-        risks = analyzer.analyze_risks(news_data)
+        risks = analyzer.analyze_risks(news_data, source_type="뉴스")
         sync.update_risks_tab(risks, tab_name="리스크 추출1")
+        
+    elif task == "report_risks":
+        logger.info("🚩 [리스크 분석 2단계 - 업무보고] 시작...")
+        drive = DriveSync()
+        target_file_id = args.file_id if args.file_id else None
+        
+        # 1. 파일 목록 가져오기
+        files = drive.get_report_files(target_file_id)
+        
+        if not files:
+            logger.warning("분석할 업무보고 파일이 없습니다.")
+            report_data = [{"제목": "업무보고 없음", "내용": "분석할 파일이 없습니다."}]
+        else:
+            report_data = []
+            for f in files:
+                logger.info(f"📄 파일 파싱 중: {f['name']}")
+                text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
+                if text:
+                    report_data.append({"제목": f['name'], "내용": text[:15000]}) # 내용이너무길면자름
+            
+            if not report_data:
+                report_data = [{"제목": "파싱 실패", "내용": "파일에서 텍스트를 추출하지 못했습니다."}]
+                
+        risks2 = analyzer.analyze_risks(report_data, source_type="보고서")
+        sync.update_risks_tab(risks2, tab_name="리스크 추출2")
         
     elif task == "persona":
         logger.info("👤 [의원 성향 분석] 시작...")
-        # 회의록 텍스트는 시트나 드라이브에서 가져오는 로직 필요 (여기선 시트 연동 위주)
-        # 실제 구현시 드라이브 파일 읽기 로직 추가 가능
-        pass
+        drive = DriveSync()
+        target_file_id = args.file_id if args.file_id else None
+        
+        # 1. 회의록 파일 목록 가져오기
+        files = drive.get_minutes_files(target_file_id)
+        
+        if not files:
+            logger.warning("분석할 회의록 파일이 없습니다.")
+            minutes_text = "회의록 데이터가 없습니다."
+        else:
+            texts = []
+            for f in files:
+                logger.info(f"📄 회의록 파싱 중: {f['name']}")
+                text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
+                if text:
+                    texts.append(text[:20000]) # 회의록은 특히 길 수 있으므로 적절히 자름
+            minutes_text = "\n\n".join(texts)
+            
+        personas = analyzer.analyze_personas(minutes_text)
+        sync.update_persona_tab(personas)
         
     elif task == "questions":
         logger.info("❓ [최종 질문 생성] 시작...")
+        drive = DriveSync()
+        
+        # 컨텍스트 보강을 위해 업무보고 파일들 가져오기
+        files = drive.get_report_files()
+        context_texts = []
+        for f in files:
+            text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
+            if text:
+                context_texts.append(f"--- {f['name']} ---\n{text[:10000]}")
+        
+        source_context = "\n\n".join(context_texts) if context_texts else "업무보고 자료 없음"
+        
         news_summary = str(sync.get_tab_data("주요 뉴스")[:15])
         risk_data = str(sync.get_tab_data("리스크 추출1")) + "\n" + str(sync.get_tab_data("리스크 추출2"))
         persona_data = str(sync.get_tab_data("의원별 관심사"))
-        # Context는 보고서 기반
-        questions = analyzer.analyze_final_questions(news_summary, risk_data, persona_data, "업무보고 자료 맥락")
+        
+        questions = analyzer.analyze_final_questions(news_summary, risk_data, persona_data, source_context)
         sync.update_questions_tab(questions)
 
     logger.info(f"✅ 작업 완료: {task}")
