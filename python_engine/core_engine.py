@@ -463,7 +463,7 @@ def main():
                 
         sync.update_persona_tab(personas)
         
-    elif task == "questions":
+    elif task == "final_questions":
         logger.info("❓ [최종 질문 생성] 시작...")
         
         # 컨텍스트 보강을 위해 업무보고 파일들 가져오기
