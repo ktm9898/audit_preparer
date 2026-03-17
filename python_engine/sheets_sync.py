@@ -176,16 +176,30 @@ class SheetsSync:
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title="의원별 관심사", rows="100", cols="10")
             
-            values = [['의원명', '지역구', '주요 관심사', '질문 성향', '예상 감사 포인트', '발언요약']]
+            import datetime
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            # 헤더: 의원명, 지역구, 주요 관심사, 발언 요약, 질문 성향, 예상 감사 포인트, 마지막 업데이트
+            header = ['의원명', '지역구', '주요 관심사', '발언 요약', '질문 성향', '예상 감사 포인트', '마지막 업데이트']
+            values = [header]
+            
             for item in persona_data:
-                values.append([
-                    item.get("의원명", item.get("이름", "")),
-                    item.get("지역구", item.get("소속", "")),
-                    item.get("주요 관심사", item.get("관심사", "")),
-                    item.get("질문 성향", item.get("성향", "")),
-                    item.get("예상 감사 포인트", item.get("감사 포인트", "")),
-                    item.get("발언요약", item.get("상세발언", ""))
-                ])
+                # AI가 리스트로 보낼 수 있는 필드를 안전하게 문자열로 변환 (API 에러 방지)
+                def safe_str(val):
+                    if isinstance(val, list):
+                        return "\n".join([str(v) for v in val])
+                    return str(val) if val is not None else ""
+
+                row = [
+                    safe_str(item.get("의원명", item.get("이름", ""))),
+                    safe_str(item.get("지역구", item.get("소속", ""))),
+                    safe_str(item.get("주요 관심사", item.get("관심사", ""))),
+                    safe_str(item.get("발언 요약", item.get("발언요약", item.get("상세발언", "")))),
+                    safe_str(item.get("질문 성향", item.get("성향", ""))),
+                    safe_str(item.get("예상 감사 포인트", item.get("감사 포인트", ""))),
+                    now_str
+                ]
+                values.append(row)
                 
             worksheet.clear()
             worksheet.update('A1', values)
