@@ -266,7 +266,15 @@ class GeminiAnalyzer:
     def _generate_json(self, prompt: str, key: str) -> List[Dict]:
         try:
             resp = self.model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
-            return json.loads(resp.text).get(key, [])
+            data = json.loads(resp.text)
+            
+            # 1. 만약 리스트(배열)로 바로 왔다면 그대로 반환
+            if isinstance(data, list):
+                return data
+            # 2. 딕셔너리(객체)로 왔다면 키값으로 추출
+            if isinstance(data, dict):
+                return data.get(key, [])
+            return []
         except Exception as e:
             logger.error(f"AI Generation Error: {e}")
             return []
