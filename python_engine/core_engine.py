@@ -321,9 +321,6 @@ def main():
     masked_id = f"{GOOGLE_SHEET_ID[:5]}...{GOOGLE_SHEET_ID[-5:]}" if GOOGLE_SHEET_ID else "None"
     logger.info(f"📍 연결된 구글 시트 ID: {masked_id}")
     
-    if drive.creds and hasattr(drive.creds, 'service_account_email'):
-        logger.info(f"🔑 서비스 계정 이메일: {drive.creds.service_account_email}")
-    
     task = args.task or "news"
     
     # 필수 환경 변수 체크 (GitHub Actions 실행 시 진단용)
