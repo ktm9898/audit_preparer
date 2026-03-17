@@ -396,7 +396,7 @@ def main():
                 logger.info(f"📄 업무보고 파싱 중: {f['name']}")
                 text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
                 if text:
-                    report_data.append({"제목": f['name'], "내용": text[:15000]}) # 내용이너무길면자름
+                    report_data.append({"제목": f['name'], "내용": text[:500000]}) # 50만자 한도 상향
             
             if not report_data:
                 risks2 = [{"리스크 요인": "분석 불가", "세부 내용": "파일은 있으나 텍스트를 추출하지 못했습니다.", "관련 근거": "추출 실패"}]
@@ -423,7 +423,7 @@ def main():
                 logger.info(f"📄 회의록 파싱 중: {f['name']}")
                 text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
                 if text:
-                    texts.append(f"--- 회의록: {f['name']} ---\n{text[:100000]}") # 텍스트 제한을 10만자로 상향하여 정보 누락 방지
+                    texts.append(f"--- 회의록: {f['name']} ---\n{text[:500000]}") # 50만자 한도 상향
             
             if not texts:
                 personas = [{"의원명": "분석 불가", "지역구": "추출 실패", "주요 관심사": "텍스트 추출 실패", "질문 성향": "-", "예상 감사 포인트": "-", "발언요약": "파일은 있으나 텍스트를 추출하지 못했습니다. (지원되지 않는 포맷 등)"}]
@@ -442,7 +442,7 @@ def main():
         for f in files:
             text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
             if text:
-                context_texts.append(f"--- {f['name']} ---\n{text[:10000]}")
+                context_texts.append(f"--- {f['name']} ---\n{text[:500000]}") # 50만자 한도 상향
         
         source_context = "\n\n".join(context_texts) if context_texts else "업무보고 자료 없음"
         
