@@ -315,6 +315,8 @@ def main():
     collector = NaverNewsCollector(NAVER_CLIENT_ID, NAVER_CLIENT_SECRET)
     analyzer = GeminiAnalyzer(GEMINI_API_KEY)
     sync = SheetsSync()
+    drive = DriveSync() # DriveSync 조기 초기화 (로그 및 태스크 공통 사용)
+
     # 디버깅용 정보 출력
     masked_id = f"{GOOGLE_SHEET_ID[:5]}...{GOOGLE_SHEET_ID[-5:]}" if GOOGLE_SHEET_ID else "None"
     logger.info(f"📍 연결된 구글 시트 ID: {masked_id}")
@@ -377,7 +379,6 @@ def main():
         
     elif task == "report_risks":
         logger.info("🚩 [리스크 분석 2단계 - 업무보고] 시작...")
-        drive = DriveSync()
         target_file_id = args.file_id if args.file_id else None
         
         # 1. 파일 목록 가져오기
@@ -403,7 +404,6 @@ def main():
         
     elif task == "persona":
         logger.info("👤 [의원 성향 분석] 시작...")
-        drive = DriveSync()
         target_file_id = args.file_id if args.file_id else None
         
         # 1. 회의록 파일 목록 가져오기
@@ -432,7 +432,6 @@ def main():
         
     elif task == "questions":
         logger.info("❓ [최종 질문 생성] 시작...")
-        drive = DriveSync()
         
         # 컨텍스트 보강을 위해 업무보고 파일들 가져오기
         files = drive.get_report_files()
