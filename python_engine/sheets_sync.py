@@ -131,6 +131,7 @@ class SheetsSync:
             
             worksheet.clear()
             worksheet.update('A1', values)
+            worksheet.update('Z1', [['READY']]) # 분석 완료 신호
             logger.info(f"✅ 구글 시트 '{tab_name}' 탭에 {len(values)-1}건 저장 완료.")
         except Exception as e:
             logger.error(f"Update Risks Tab Error ({tab_name}): {e}")
@@ -158,6 +159,7 @@ class SheetsSync:
             
             worksheet.clear()
             worksheet.update('A1', values)
+            worksheet.update('Z1', [['READY']]) # 분석 완료 신호
             logger.info(f"✅ 구글 시트 '예상 질문' 탭에 {len(values)-1}건 저장 완료.")
         except Exception as e:
             logger.error(f"Update Questions Tab Error: {e}")
@@ -187,6 +189,7 @@ class SheetsSync:
                 
             worksheet.clear()
             worksheet.update('A1', values)
+            worksheet.update('Z1', [['READY']]) # 분석 완료 신호
             logger.info(f"✅ 구글 시트 '의원별 관심사' 탭에 {len(values)-1}건 저장 완료.")
         except Exception as e:
             logger.error(f"Update Persona Tab Error: {e}")
