@@ -41,13 +41,15 @@ class DriveSync:
         try:
             results = self.service.files().list(
                 q=query, 
-                fields="files(id, name)",
+                fields="files(id, name, createdTime)",
                 supportsAllDrives=True,
-                includeItemsFromAllDrives=True
+                includeItemsFromAllDrives=True,
+                orderBy="createdTime desc" # 가장 최근 폴더 우선
             ).execute()
             files = results.get('files', [])
             if files:
-                logger.info(f"📁 폴더 발견: {folder_name} (ID: {files[0]['id']})")
+                for f in files:
+                    logger.info(f"📁 폴더 매칭됨: '{f['name']}' (ID: {f['id']}, 생성일: {f.get('createdTime')})")
                 return files[0]['id']
             logger.warning(f"⚠️ 폴더를 찾을 수 없음: {folder_name}")
             return None

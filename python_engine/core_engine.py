@@ -404,6 +404,8 @@ def main():
         
         # 1. 회의록 파일 목록 가져오기
         files = drive.get_minutes_files(target_file_id)
+        logger.info(f"📁 발견된 회의록 파일 수: {len(files)}개")
+        for f in files: logger.info(f"   - {f['name']} (ID: {f['id']})")
         
         if not files:
             logger.warning("분석할 회의록 파일이 없습니다.")
