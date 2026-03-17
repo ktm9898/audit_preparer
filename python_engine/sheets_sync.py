@@ -92,7 +92,7 @@ class SheetsSync:
             logger.error(f"Sheets Update Error: {e}")
 
     def get_tab_data(self, tab_name: str) -> List[Dict]:
-        """특정 탭의 데이터를 읽어옴 (첫 행은 헤더)"""
+        """특정 탭의 데이터를 읽어옴 (빈 헤더 및 중복 헤더 방어 로직 포함)"""
         if not self.client: return []
         try:
             sh = self.client.open_by_key(GOOGLE_SHEET_ID)
@@ -102,7 +102,32 @@ class SheetsSync:
                 logger.warning(f"탭 '{tab_name}'을 찾을 수 없습니다.")
                 return []
             
-            records = worksheet.get_all_records()
+            # get_all_records()의 빈 헤더 중복 에러를 피하기 위해 get_all_values() 사용
+            all_values = worksheet.get_all_values()
+            if not all_values:
+                return []
+            
+            headers = all_values[0]
+            data_rows = all_values[1:]
+            
+            # 실제 데이터가 있는 컬럼까지만 헤더 유효성 검사 (빈 헤더 제거)
+            valid_header_count = 0
+            for h in headers:
+                if h.strip():
+                    valid_header_count += 1
+                else:
+                    break
+            
+            clean_headers = headers[:valid_header_count]
+            
+            records = []
+            for row in data_rows:
+                # 데이터 행도 유효한 헤더 개수만큼만 자름
+                clean_row = row[:valid_header_count]
+                # 딕셔너리로 변환
+                record = {clean_headers[i]: clean_row[i] for i in range(len(clean_headers))}
+                records.append(record)
+                
             return records
         except Exception as e:
             logger.error(f"Get Tab Data Error ({tab_name}): {e}")
