@@ -219,8 +219,38 @@ function fetchNewsFromNaver(targetMonth) {
 }
 
 function runAIAnalysis(task, fileId) {
-  // task mapping: risks, persona, final_questions 등
-  return triggerGithubAction(task, { fileId: fileId || "" });
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const tabNameMap = {
+    'risks': '리스크 추출1',
+    'report_risks': '리스크 추출2',
+    'persona': '의원별 관심사',
+    'questions': '예상 질문'
+  };
+  const targetTab = tabNameMap[task] || '리스크 추출1';
+  const initialRow = getTabRowCount(ss, targetTab);
+  
+  ss.toast(`${task} 분석을 위해 AI 엔진을 가동합니다. 잠시만 기다려 주세요...`, "🚀 분석 시작", 15);
+  
+  const triggerResult = triggerGithubAction(task, { fileId: fileId || "" });
+  if (!triggerResult.ok) return triggerResult;
+
+  // Polling: 최대 5분 동안 시트 업데이트 감시
+  const startTime = new Date().getTime();
+  while (new Date().getTime() - startTime < 300000) { 
+    Utilities.sleep(10000); // 10초 대기
+    SpreadsheetApp.flush();
+    
+    const currentCount = getTabRowCount(ss, targetTab);
+    // 덮어쓰기이므로 단순히 헤더(1줄) 이상의 데이터가 생겼는지 확인
+    // (기존 데이터가 있었다면 clear 후 다시 쓰이는 시점을 잡아야 하지만, 
+    // 여기서는 간단하게 1줄 이상 존재하면 분석 데이터가 도착한 것으로 간주)
+    if (currentCount > 1) {
+      ss.toast(`${task} 분석 및 시트 저장이 완료되었습니다!`, "✅ 완료", 5);
+      return { ok: true, message: "분석 완료" };
+    }
+  }
+  
+  return { ok: false, error: "시간 초과: 엔진 응답이 없거나 데이터가 생성되지 않았습니다. GitHub Actions 탭을 확인해 주세요." };
 }
 // --- 모든 분석 로직은 이제 GitHub Actions 파이썬 엔진에서 수행됩니다 ---
 

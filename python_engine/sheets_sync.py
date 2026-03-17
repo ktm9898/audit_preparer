@@ -113,25 +113,25 @@ class SheetsSync:
         if not self.client: return
         try:
             sh = self.client.open_by_key(GOOGLE_SHEET_ID)
+            logger.info(f"💾 대상 시트 확인: '{sh.title}' ({tab_name} 탭)")
+            
             try:
                 worksheet = sh.worksheet(tab_name)
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title=tab_name, rows="100", cols="10")
             
-            worksheet.clear()
-            worksheet.append_row(['리스크 요인', '세부 내용', '관련 근거'])
-            
-            rows = []
+            # 준비된 데이터를 한 번에 업데이트 (속도 및 상호작용 안정성 향상)
+            values = [['리스크 요인', '세부 내용', '관련 근거']]
             for item in risk_data:
-                rows.append([
+                values.append([
                     item.get("리스크 요인", item.get("요인", "")),
                     item.get("세부 내용", item.get("내용", "")),
                     item.get("관련 근거", item.get("근거", ""))
                 ])
-                
-            if rows:
-                worksheet.append_rows(rows)
-                logger.info(f"구글 시트 '{tab_name}' 탭에 {len(rows)}건 저장 완료.")
+            
+            worksheet.clear()
+            worksheet.update('A1', values)
+            logger.info(f"✅ 구글 시트 '{tab_name}' 탭에 {len(values)-1}건 저장 완료.")
         except Exception as e:
             logger.error(f"Update Risks Tab Error ({tab_name}): {e}")
 
@@ -140,26 +140,25 @@ class SheetsSync:
         if not self.client: return
         try:
             sh = self.client.open_by_key(GOOGLE_SHEET_ID)
+            logger.info(f"💾 대상 시트 확인: '{sh.title}' (예상 질문 탭)")
+            
             try:
                 worksheet = sh.worksheet("예상 질문")
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title="예상 질문", rows="100", cols="10")
             
-            worksheet.clear()
-            worksheet.append_row(['분류', '의원명', '질문', '답변 가이드'])
-            
-            rows = []
+            values = [['분류', '의원명', '질문', '답변 가이드']]
             for item in questions_data:
-                rows.append([
+                values.append([
                     item.get("분류", ""),
                     item.get("의원명", ""),
                     item.get("질문", item.get("예상 질문", "")),
                     item.get("답변 가이드", item.get("답변 방향", item.get("대응방안", "")))
                 ])
-                
-            if rows:
-                worksheet.append_rows(rows)
-                logger.info(f"구글 시트 '예상 질문' 탭에 {len(rows)}건 저장 완료.")
+            
+            worksheet.clear()
+            worksheet.update('A1', values)
+            logger.info(f"✅ 구글 시트 '예상 질문' 탭에 {len(values)-1}건 저장 완료.")
         except Exception as e:
             logger.error(f"Update Questions Tab Error: {e}")
 
@@ -168,17 +167,16 @@ class SheetsSync:
         if not self.client: return
         try:
             sh = self.client.open_by_key(GOOGLE_SHEET_ID)
+            logger.info(f"💾 대상 시트 확인: '{sh.title}' (의원별 관심사 탭)")
+            
             try:
                 worksheet = sh.worksheet("의원별 관심사")
             except gspread.exceptions.WorksheetNotFound:
                 worksheet = sh.add_worksheet(title="의원별 관심사", rows="100", cols="10")
             
-            worksheet.clear()
-            worksheet.append_row(['의원명', '지역구', '주요 관심사', '질문 성향', '예상 감사 포인트', '발언요약'])
-            
-            rows = []
+            values = [['의원명', '지역구', '주요 관심사', '질문 성향', '예상 감사 포인트', '발언요약']]
             for item in persona_data:
-                rows.append([
+                values.append([
                     item.get("의원명", item.get("이름", "")),
                     item.get("지역구", item.get("소속", "")),
                     item.get("주요 관심사", item.get("관심사", "")),
@@ -187,9 +185,9 @@ class SheetsSync:
                     item.get("발언요약", item.get("상세발언", ""))
                 ])
                 
-            if rows:
-                worksheet.append_rows(rows)
-                logger.info(f"구글 시트 '의원별 관심사' 탭에 {len(rows)}건 저장 완료.")
+            worksheet.clear()
+            worksheet.update('A1', values)
+            logger.info(f"✅ 구글 시트 '의원별 관심사' 탭에 {len(values)-1}건 저장 완료.")
         except Exception as e:
             logger.error(f"Update Persona Tab Error: {e}")
 

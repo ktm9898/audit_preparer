@@ -307,6 +307,9 @@ def main():
     collector = NaverNewsCollector(NAVER_CLIENT_ID, NAVER_CLIENT_SECRET)
     analyzer = GeminiAnalyzer(GEMINI_API_KEY)
     sync = SheetsSync()
+    # 디버깅용 시트 ID 마스킹 출력
+    masked_id = f"{GOOGLE_SHEET_ID[:5]}...{GOOGLE_SHEET_ID[-5:]}" if GOOGLE_SHEET_ID else "None"
+    logger.info(f"📍 연결된 구글 시트 ID: {masked_id}")
     
     task = args.task or "news"
     
