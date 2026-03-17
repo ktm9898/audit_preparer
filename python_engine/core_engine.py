@@ -431,7 +431,7 @@ def main():
             if not report_data:
                 risks2 = [{"리스크 요인": "분석 불가", "세부 내용": "파일은 있으나 텍스트를 추출하지 못했습니다.", "관련 근거": "추출 실패"}]
             else:
-                risks2 = self.analyzer.analyze_risks(report_data, source_type="보고서")
+                risks2 = analyzer.analyze_risks(report_data, source_type="보고서")
         
         sync.update_risks_tab(risks2, tab_name="리스크 추출2")
         
