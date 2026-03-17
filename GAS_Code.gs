@@ -224,33 +224,37 @@ function runAIAnalysis(task, fileId) {
     'risks': '리스크 추출1',
     'report_risks': '리스크 추출2',
     'persona': '의원별 관심사',
-    'questions': '예상 질문'
+    'questions': '예상 질문',
+    'final_questions': '예상 질문'
   };
   const targetTab = tabNameMap[task] || '리스크 추출1';
-  const initialRow = getTabRowCount(ss, targetTab);
+  const sheet = getOrCreateSheet(ss, targetTab);
   
-  ss.toast(`${task} 분석을 위해 AI 엔진을 가동합니다. 잠시만 기다려 주세요...`, "🚀 분석 시작", 15);
+  // 1. 분석 시작 전 시트를 비워서 폴링이 즉시 종료되지 않게 함
+  sheet.clear();
+  sheet.append_row(['분석 준비 중...', 'AI 엔진 가동을 시작합니다.']);
+  SpreadsheetApp.flush();
+  
+  ss.toast(`${targetTab} 분석을 위해 AI 엔진을 가동합니다. 약 1~2분 소요됩니다.`, "🚀 분석 시작", 60);
   
   const triggerResult = triggerGithubAction(task, { fileId: fileId || "" });
   if (!triggerResult.ok) return triggerResult;
 
-  // Polling: 최대 5분 동안 시트 업데이트 감시
+  // 2. Polling: 최대 5분 동안 시트 업데이트 감시
   const startTime = new Date().getTime();
   while (new Date().getTime() - startTime < 300000) { 
     Utilities.sleep(10000); // 10초 대기
     SpreadsheetApp.flush();
     
-    const currentCount = getTabRowCount(ss, targetTab);
-    // 덮어쓰기이므로 단순히 헤더(1줄) 이상의 데이터가 생겼는지 확인
-    // (기존 데이터가 있었다면 clear 후 다시 쓰이는 시점을 잡아야 하지만, 
-    // 여기서는 간단하게 1줄 이상 존재하면 분석 데이터가 도착한 것으로 간주)
-    if (currentCount > 1) {
-      ss.toast(`${task} 분석 및 시트 저장이 완료되었습니다!`, "✅ 완료", 5);
+    // 첫 행이 '분석 준비 중...'이 아니면 데이터가 써진 것으로 간주
+    const firstCellValue = sheet.getRange(1, 1).getValue();
+    if (firstCellValue && firstCellValue !== '분석 준비 중...') {
+      ss.toast(`${targetTab} 분석 및 시트 저장이 완료되었습니다!`, "✅ 완료", 5);
       return { ok: true, message: "분석 완료" };
     }
   }
   
-  return { ok: false, error: "시간 초과: 엔진 응답이 없거나 데이터가 생성되지 않았습니다. GitHub Actions 탭을 확인해 주세요." };
+  return { ok: false, error: "시간 초과: 엔진 응답이 없거나 데이터가 생성되지 않았습니다." };
 }
 // --- 모든 분석 로직은 이제 GitHub Actions 파이썬 엔진에서 수행됩니다 ---
 
