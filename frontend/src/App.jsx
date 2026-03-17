@@ -125,8 +125,15 @@ function App() {
   };
 
   const handleAction = async (task, fileId = null) => {
+    const statusMessages = {
+      'risks': '수집된 주요 뉴스를 기반으로 리스크를 분석 중입니다...',
+      'report_risks': '보관함의 업무보고 자료를 취합하여 리스크를 분석 중입니다...',
+      'persona': '보관함의 회의록 자료를 취합하여 의원 성향을 분석 중입니다...',
+      'final_questions': '모든 분석 데이터를 종합하여 최종 예상 질문을 생성 중입니다...'
+    };
+
     setLoading(true);
-    setStatus(fileId ? '선택한 파일을 분석 중입니다...' : '보관함의 모든 파일을 취합하여 AI 분석 중입니다... (약 1분 소요)');
+    setStatus(statusMessages[task] || (fileId ? '선택한 파일을 분석 중입니다...' : '요청하신 분석을 수행 중입니다...'));
     try {
       const response = await fetch(API_BASE, {
         method: 'POST',
