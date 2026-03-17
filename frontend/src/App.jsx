@@ -499,7 +499,7 @@ function App() {
 
                           <div className="audit-section danger">
                             <label>핵심 감사 포인트</label>
-                            <p>{p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || "-"}</p>
+                            <p>{p["핵심 감사 포인트"] || p["예상 감사 포인트"] || p["감사 포인트"] || p["공격 포인트"] || "-"}</p>
                           </div>
                         </div>
                       </div>
