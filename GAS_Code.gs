@@ -232,7 +232,7 @@ function runAIAnalysis(task, fileId) {
   
   // 1. 분석 시작 전 시트를 비워서 폴링이 즉시 종료되지 않게 함
   sheet.clear();
-  sheet.append_row(['분석 준비 중...', 'AI 엔진 가동을 시작합니다.']);
+  sheet.appendRow(['분석 준비 중...', 'AI 엔진 가동을 시작합니다.']);
   SpreadsheetApp.flush();
   
   ss.toast(`${targetTab} 분석을 위해 AI 엔진을 가동합니다. 약 1~2분 소요됩니다.`, "🚀 분석 시작", 60);
