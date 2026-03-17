@@ -13,6 +13,9 @@ GOOGLE_SHEET_ID = os.environ.get("GOOGLE_SHEET_ID")
 # service_account.json 경로 또는 JSON 문자열
 GOOGLE_CREDENTIALS_JSON = os.environ.get("GOOGLE_CREDENTIALS_JSON")
 
+# Google Drive
+GOOGLE_DRIVE_FOLDER_ID = os.environ.get("GOOGLE_DRIVE_FOLDER_ID") # 이름 검색 실패 시 대비용 폴더 ID
+
 # Search Settings
 SEARCH_QUERY = "서울신용보증재단"
 MAX_NEWS_COUNT = 15

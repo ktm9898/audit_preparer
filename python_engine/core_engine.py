@@ -315,9 +315,12 @@ def main():
     collector = NaverNewsCollector(NAVER_CLIENT_ID, NAVER_CLIENT_SECRET)
     analyzer = GeminiAnalyzer(GEMINI_API_KEY)
     sync = SheetsSync()
-    # 디버깅용 시트 ID 마스킹 출력
+    # 디버깅용 정보 출력
     masked_id = f"{GOOGLE_SHEET_ID[:5]}...{GOOGLE_SHEET_ID[-5:]}" if GOOGLE_SHEET_ID else "None"
     logger.info(f"📍 연결된 구글 시트 ID: {masked_id}")
+    
+    if drive.creds and hasattr(drive.creds, 'service_account_email'):
+        logger.info(f"🔑 서비스 계정 이메일: {drive.creds.service_account_email}")
     
     task = args.task or "news"
     
@@ -382,19 +385,20 @@ def main():
         
         if not files:
             logger.warning("분석할 업무보고 파일이 없습니다.")
-            report_data = [{"제목": "업무보고 없음", "내용": "분석할 파일이 없습니다."}]
+            risks2 = [{"리스크 요인": "분석 불가", "세부 내용": "보관함에 업무보고 파일이 없습니다. 파일을 업로드 후 다시 실행하세요.", "관련 근거": "파일 부재"}]
         else:
             report_data = []
             for f in files:
-                logger.info(f"📄 파일 파싱 중: {f['name']}")
+                logger.info(f"📄 업무보고 파싱 중: {f['name']}")
                 text = drive.extract_text_from_file(f['id'], f.get('mimeType', ''), f['name'])
                 if text:
                     report_data.append({"제목": f['name'], "내용": text[:15000]}) # 내용이너무길면자름
             
             if not report_data:
-                report_data = [{"제목": "파싱 실패", "내용": "파일에서 텍스트를 추출하지 못했습니다."}]
-                
-        risks2 = analyzer.analyze_risks(report_data, source_type="보고서")
+                risks2 = [{"리스크 요인": "분석 불가", "세부 내용": "파일은 있으나 텍스트를 추출하지 못했습니다.", "관련 근거": "추출 실패"}]
+            else:
+                risks2 = self.analyzer.analyze_risks(report_data, source_type="보고서")
+        
         sync.update_risks_tab(risks2, tab_name="리스크 추출2")
         
     elif task == "persona":

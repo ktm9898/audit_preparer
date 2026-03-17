@@ -61,6 +61,8 @@ class DriveSync:
         """지정된 보관함 폴더(reports 또는 minutes)의 파일 목록 또는 특정 파일 정보 반환"""
         if not self.service: return []
         
+        from config import GOOGLE_DRIVE_FOLDER_ID
+        
         if specific_file_id:
             try:
                 file_meta = self.service.files().get(
@@ -73,12 +75,18 @@ class DriveSync:
                 logger.error(f"Get Specific File Error: {e}")
                 return []
                 
-        # "Audit_Preparer_Files" 폴더 찾기
-        parent_id = self._get_folder_id("Audit_Preparer_Files")
+        # 1. 상위 폴더 ID 결정 (직접 지정 ID가 있으면 우선 사용, 없으면 이름 검색)
+        parent_id = GOOGLE_DRIVE_FOLDER_ID
+        if parent_id:
+            logger.info(f"📍 설정된 상위 폴더 ID 사용: {parent_id}")
+        else:
+            parent_id = self._get_folder_id("Audit_Preparer_Files")
+            
         if not parent_id:
             logger.error("Audit_Preparer_Files 폴더를 찾을 수 없습니다. 서비스 계정에 폴더가 공유되었는지 확인하세요.")
             return []
             
+        # 2. 하위 폴더(reports, minutes) 찾기
         target_folder_id = self._get_folder_id(subfolder_name, parent_id)
         if not target_folder_id:
             logger.error(f"{subfolder_name} 폴더를 찾을 수 없습니다. (상위 폴더 ID: {parent_id})")
