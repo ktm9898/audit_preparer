@@ -3,6 +3,8 @@ import logging
 import requests
 import time
 import datetime
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning) # 구글 SDK 경고 숨김
 from email.utils import parsedate_to_datetime
 from typing import List, Dict, Tuple
 from newspaper import Article, Config
@@ -203,9 +205,11 @@ class GeminiAnalyzer:
         except Exception as e:
             logger.error(f"Deep Analysis Error: {e}")
             return news_list
-
     def analyze_risks(self, data_list: List[Dict], source_type: str = "뉴스") -> List[Dict]:
         """[복원] 기존 GAS runAIAnalysis('risks') 원본 프롬프트"""
+        logger.info(f"📊 [{source_type} 리스크 분석] 대상 데이터: {len(data_list)}건")
+        if not data_list:
+            return []
         data_text = "\n".join([f"- {n.get('title') or n.get('제목')}: {n.get('description') or n.get('내용')}" for n in data_list])
         prompt = f"""[미션] 서울신용보증재단 {source_type} 데이터를 바탕으로 행정감사 리스크 쟁점 20개를 도출하세요. 
 (JSON 형식: {{"risks": [{{"리스크 요인": "...", "세부 내용": "...", "관련 근거": "..."}}]}})
@@ -216,6 +220,9 @@ class GeminiAnalyzer:
 
     def analyze_personas(self, minutes_text: str) -> List[Dict]:
         """[복원] 기존 GAS runAIAnalysis('persona') 원본 프롬프트"""
+        logger.info(f"👤 [의원 성향 분석] 대상 텍스트 길이: {len(minutes_text)}자")
+        if len(minutes_text) < 10:
+            return []
         prompt = f"""당신은 행정사무감사 전문 분석 AI입니다. 의원별 상세 성향 리포트를 작성하세요.
 (JSON 형식: {{"personas": [{{"의원명": "...", "지역구": "...", "주요 관심사": "...", "질문 성향": "...", "예상 감사 포인트": "...", "발언요약": "..."}}]}})
 
